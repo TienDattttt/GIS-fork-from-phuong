@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Fetcher - Tải dữ liệu từ GEE</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: rgba(255,255,255,0.95);
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 0.9em;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+        }
+        input, select {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 1em;
+            transition: all 0.3s;
+        }
+        input:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102,126,234,0.1);
+        }
+        .checkbox-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .checkbox-item:hover {
+            background: #e9ecef;
+        }
+        .checkbox-item input[type="checkbox"] {
+            width: auto;
+            cursor: pointer;
+        }
+        .btn-primary {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 20px;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(102,126,234,0.4);
+        }
+        .btn-primary:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .status {
+            margin-top: 30px;
+            padding: 20px;
+            border-radius: 10px;
+            display: none;
+        }
+        .status.info {
+            background: #e3f2fd;
+            border: 2px solid #2196f3;
+            color: #1565c0;
+            display: block;
+        }
+        .status.success {
+            background: #e8f5e9;
+            border: 2px solid #4caf50;
+            color: #2e7d32;
+            display: block;
+        }
+        .status.error {
+            background: #ffebee;
+            border: 2px solid #f44336;
+            color: #c62828;
+            display: block;
+        }
+        .progress {
+            margin-top: 15px;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            background: #e0e0e0;
+            border-radius: 15px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            width: 0%;
+            transition: width 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 0.85em;
+        }
+        .log {
+            margin-top: 15px;
+            max-height: 200px;
+            overflow-y: auto;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+        }
+        .log-item {
+            padding: 5px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .log-item:last-child {
+            border-bottom: none;
+        }
+        .warning {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            color: #856404;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌍 Data Fetcher</h1>
+        <p class="subtitle">Tải dữ liệu từ Google Earth Engine vào Database</p>
+
+        <div class="warning">
+            ⚠️ <strong>Lưu ý:</strong> Cần chạy Python backend và đã cấu hình GEE API
+        </div>
+
+        <form id="fetchForm">
+            <div class="form-group">
+                <label>📍 Địa điểm</label>
+                <select id="province" required>
+                    <option value="">-- Chọn tỉnh --</option>
+                    <option value="Quang Tri">Quảng Trị</option>
+                    <option value="Thua Thien Hue">Thừa Thiên Huế</option>
+                    <option value="Quang Binh">Quảng Bình</option>
+                    <option value="Ha Tinh">Hà Tĩnh</option>
+                    <option value="Nghe An">Nghệ An</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>🆔 Location ID trong Database</label>
+                <input type="number" id="locationId" value="1" required min="1">
+            </div>
+
+            <div class="form-group">
+                <label>📅 Từ ngày</label>
+                <input type="date" id="startDate" value="2020-01-01" required>
+            </div>
+
+            <div class="form-group">
+                <label>📅 Đến ngày</label>
+                <input type="date" id="endDate" value="2020-12-31" required>
+            </div>
+
+            <div class="form-group">
+                <label>📊 Chọn loại dữ liệu cần tải</label>
+                <div class="checkbox-group">
+                    <label class="checkbox-item">
+                        <input type="checkbox" name="dataTypes" value="rainfall" checked>
+                        <span>🌧️ Lượng mưa</span>
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" name="dataTypes" value="temperature" checked>
+                        <span>🌡️ Nhiệt độ</span>
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" name="dataTypes" value="soil_moisture" checked>
+                        <span>💧 Độ ẩm đất</span>
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" name="dataTypes" value="ndvi" checked>
+                        <span>🌿 NDVI</span>
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" name="dataTypes" value="tvdi" checked>
+                        <span>🔥 TVDI</span>
+                    </label>
+                </div>
+            </div>
+
+            <button type="submit" class="btn-primary" id="fetchBtn">
+                🚀 Bắt đầu tải dữ liệu
+            </button>
+        </form>
+
+        <div id="status" class="status"></div>
+    </div>
+
+    <script>
+        const API = 'http://localhost:3001'; // Python Flask API
+
+        document.getElementById('fetchForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const province = document.getElementById('province').value;
+            const locationId = parseInt(document.getElementById('locationId').value);
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            
+            const checkedBoxes = document.querySelectorAll('input[name="dataTypes"]:checked');
+            const dataTypes = Array.from(checkedBoxes).map(cb => cb.value);
+            
+            if (dataTypes.length === 0) {
+                showStatus('error', '❌ Vui lòng chọn ít nhất một loại dữ liệu');
+                return;
+            }
+
+            const btn = document.getElementById('fetchBtn');
+            btn.disabled = true;
+            btn.textContent = '⏳ Đang xử lý...';
+
+            showStatus('info', `🔄 Đang khởi tạo... Khu vực: ${province}, Thời gian: ${startDate} → ${endDate}`);
+
+            try {
+                const response = await fetch(`${API}/fetch-data`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        province,
+                        location_id: locationId,
+                        start_date: startDate,
+                        end_date: endDate,
+                        data_types: dataTypes
+                    })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    let successMsg = '✅ Hoàn thành tải dữ liệu!<div class="log">';
+                    
+                    if (result.results) {
+                        Object.keys(result.results).forEach(key => {
+                            const data = result.results[key];
+                            successMsg += `<div class="log-item">📊 ${key}: ${data.records || 0} bản ghi</div>`;
+                        });
+                    }
+                    
+                    successMsg += '</div>';
+                    showStatus('success', successMsg);
+                } else {
+                    showStatus('error', `❌ Lỗi: ${result.error || 'Unknown error'}`);
+                }
+            } catch (err) {
+                showStatus('error', `❌ Không thể kết nối đến Python API:<br>${err.message}<br><br>Đảm bảo đã chạy: <code>python api_server.py</code>`);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '🚀 Bắt đầu tải dữ liệu';
+            }
+        });
+
+        function showStatus(type, message) {
+            const status = document.getElementById('status');
+            status.className = `status ${type}`;
+            status.innerHTML = message;
+        }
+    </script>
+</body>
+</html>

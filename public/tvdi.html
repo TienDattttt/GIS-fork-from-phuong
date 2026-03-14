@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phân tích TVDI - Hạn hán - Web GIS</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            color: #fff;
+        }
+        
+        nav {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            padding: 15px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .nav-container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        #userInfo {
+            margin-left: auto;
+        }
+
+        #userInfo button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 0.9em;
+        }
+
+        #userInfo button:hover {
+            background: rgba(255,107,107,0.3);
+            transform: translateY(-2px);
+        }
+        .logo {
+            font-size: 1.5em;
+            font-weight: bold;
+            background: linear-gradient(90deg, #00d9ff, #00ff88);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .nav-links {
+            display: flex;
+            gap: 20px;
+            list-style: none;
+        }
+        .nav-links a {
+            color: rgba(255,255,255,0.8);
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            transition: all 0.3s;
+        }
+        .nav-links a:hover, .nav-links a.active {
+            background: rgba(255,255,255,0.1);
+            color: #ff8c42;
+        }
+
+        .container { max-width: 1600px; margin: 0 auto; padding: 20px; }
+        
+        .page-header {
+            background: rgba(255,255,255,0.05);
+            backdrop-filter: blur(10px);
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            border-left: 4px solid #ff8c42;
+        }
+        .page-title {
+            font-size: 2em;
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .page-subtitle { color: rgba(255,255,255,0.7); }
+
+        .gee-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 0.9em;
+            margin-top: 15px;
+        }
+        .gee-status.online {
+            background: rgba(76, 175, 80, 0.2);
+            border: 1px solid rgba(76, 175, 80, 0.5);
+            color: #4caf50;
+        }
+        .gee-status.offline {
+            background: rgba(244, 67, 54, 0.2);
+            border: 1px solid rgba(244, 67, 54, 0.5);
+            color: #f44336;
+        }
+
+        .controls {
+            background: rgba(255,255,255,0.05);
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .control-row { display: flex; gap: 15px; flex-wrap: wrap; align-items: flex-end; }
+        .form-group { display: flex; flex-direction: column; min-width: 150px; }
+        .form-group label { font-size: 0.85em; color: rgba(255,255,255,0.7); margin-bottom: 5px; }
+        select, input {
+            padding: 10px 12px;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 8px;
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            font-size: 0.95em;
+        }
+        select option { background: #1a1a2e; color: #fff; }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn-primary { 
+            background: linear-gradient(135deg, #ff8c42, #ff6b35); 
+            color: #fff;
+        }
+        .btn-secondary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+        button:hover { 
+            transform: translateY(-2px); 
+            box-shadow: 0 5px 20px rgba(255,140,66,0.4); 
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal.show { display: flex; }
+        .modal-content {
+            background: #1a1a2e;
+            padding: 30px;
+            border-radius: 15px;
+            max-width: 500px;
+            width: 90%;
+            border: 2px solid #ff8c42;
+        }
+        .modal-title {
+            font-size: 1.5em;
+            margin-bottom: 20px;
+            color: #ff8c42;
+        }
+        .modal-body { margin-bottom: 20px; }
+        .modal-footer { display: flex; gap: 10px; justify-content: flex-end; }
+
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            overflow: hidden;
+            margin: 15px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ff8c42, #ff6b35);
+            width: 0%;
+            transition: width 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+
+        .log {
+            background: rgba(0,0,0,0.3);
+            padding: 15px;
+            border-radius: 8px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+            margin-top: 15px;
+        }
+        .log-item {
+            padding: 5px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .alert-banner {
+            background: linear-gradient(135deg, rgba(255,140,66,0.2), rgba(255,107,107,0.2));
+            border: 2px solid #ff8c42;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .alert-title { font-size: 1.3em; font-weight: bold; margin-bottom: 10px; color: #ff8c42; }
+        .drought-level {
+            display: inline-block;
+            padding: 10px 25px;
+            border-radius: 25px;
+            font-weight: bold;
+            font-size: 1.2em;
+            margin: 10px 0;
+        }
+        .level-wet { background: #2166ac; }
+        .level-normal { background: #67a9cf; }
+        .level-moderate { background: #fddbc7; color: #333; }
+        .level-severe { background: #ef8a62; }
+        .level-extreme { background: #b2182b; }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-left: 4px solid #ff8c42;
+        }
+        .stat-icon { font-size: 2em; margin-bottom: 10px; }
+        .stat-value { font-size: 2em; font-weight: bold; margin-bottom: 5px; color: #ff8c42; }
+        .stat-label { font-size: 0.9em; color: rgba(255,255,255,0.6); }
+        
+        .dashboard { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 20px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .card-title {
+            font-size: 1.2em;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .full-width { grid-column: 1 / -1; }
+        canvas { max-height: 350px; }
+
+        .legend {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin-top: 15px;
+            justify-content: center;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9em;
+        }
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+        }
+        #droughtDesc {
+            margin-top: 15px;
+            color: rgba(255,255,255,0.95);
+            text-align: left;
+            line-height: 1.8;
+            padding: 15px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            font-size: 0.95em;
+        }
+
+        #droughtDesc strong {
+            color: #ff8c42;
+            display: block;
+            margin-top: 10px;
+            margin-bottom: 5px;
+        }
+        @media (max-width: 768px) {
+            .dashboard { grid-template-columns: 1fr; }
+            .control-row { flex-direction: column; }
+            .nav-links { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <div class="nav-container">
+            <div class="logo" style="margin-right: 30px;">🌍 Trang chủ </div>
+            <ul class="nav-links">
+                <li><a href="index.html"  >Trang chủ</a></li>
+                <li><a href="rainfall.html">Lượng mưa</a></li>
+                <li><a href="temperature.html">Nhiệt độ</a></li>
+                <li><a href="ndvi.html">NDVI</a></li>
+                <li><a href="tvdi.html" class="active">TVDI</a></li>
+            </ul>
+            <div id="userInfo"></div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="page-header">
+            <div class="page-title">🔥 Phân tích TVDI - Chỉ số Hạn hán</div>
+            <p class="page-subtitle">Temperature Vegetation Dryness Index (MODIS LST & NDVI)</p>
+            <div id="geeStatus" class="gee-status offline">
+                ⏳ Đang kiểm tra GEE service...
+            </div>
+        </div>
+
+        <div class="controls">
+            <div class="control-row">
+                <div class="form-group">
+                    <label>📍 Địa điểm</label>
+                    <select id="location">
+                        <option value="1" data-province="Quang Tri">Quảng Trị</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>📅 Từ ngày</label>
+                    <input type="date" id="startDate" value="2020-01-01">
+                </div>
+                <div class="form-group">
+                    <label>📅 Đến ngày</label>
+                    <input type="date" id="endDate" value="2020-12-31">
+                </div>
+                <button class="btn-secondary" onclick="openFetchModal()" id="btnFetch">
+                    🌍 Tải từ GEE
+                </button>
+                <button class="btn-primary" onclick="loadData()">
+                    🔍 Phân tích
+                </button>
+            </div>
+        </div>
+
+        <div id="alertBanner" class="alert-banner" style="display:none;">
+            <div class="alert-title">⚠️ CẢNH BÁO HẠN HÁN</div>
+            <div class="drought-level" id="droughtLevel">--</div>
+            <p id="droughtDesc" style="margin-top:10px; color:rgba(255,255,255,0.9);">--</p>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon">📊</div>
+                <div class="stat-value" id="avgTvdi">--</div>
+                <div class="stat-label">TVDI trung bình</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">🌡️</div>
+                <div class="stat-value" id="avgLst">--</div>
+                <div class="stat-label">Nhiệt độ bề mặt TB (°C)</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">🔍</div>
+                <div class="stat-value" id="droughtPct">--</div>
+                <div class="stat-label">Diện tích hạn (%)</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">⚠️</div>
+                <div class="stat-value" id="severeDays">--</div>
+                <div class="stat-label">Ngày hạn nặng</div>
+            </div>
+        </div>
+
+        <div class="dashboard">
+            <div class="card full-width">
+                <div class="card-title">📈 Biểu đồ TVDI theo thời gian</div>
+                <canvas id="tvdiChart"></canvas>
+                <div class="legend">
+                    <div class="legend-item"><div class="legend-color" style="background:#2166ac"></div>Ẩm (< 0.2)</div>
+                    <div class="legend-item"><div class="legend-color" style="background:#67a9cf"></div>Bình thường (0.2-0.4)</div>
+                    <div class="legend-item"><div class="legend-color" style="background:#fddbc7"></div>Hạn nhẹ (0.4-0.6)</div>
+                    <div class="legend-item"><div class="legend-color" style="background:#ef8a62"></div>Hạn nặng (0.6-0.8)</div>
+                    <div class="legend-item"><div class="legend-color" style="background:#b2182b"></div>Hạn cực đoan (> 0.8)</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">📊 Thống kê theo tháng</div>
+                <canvas id="monthlyChart"></canvas>
+            </div>
+
+            <div class="card">
+                <div class="card-title">🔥 Phân loại hạn hán</div>
+                <canvas id="classChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Fetch từ GEE -->
+    <div id="fetchModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-title">🌍 Tải dữ liệu TVDI từ Google Earth Engine</div>
+            <div class="modal-body">
+                <p style="color: rgba(255,255,255,0.7); margin-bottom: 15px;">
+                    🔥 Tải dữ liệu TVDI (LST & NDVI) từ MODIS cho khoảng thời gian đã chọn
+                </p>
+                <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                    <div style="margin-bottom: 8px;">
+                        <strong>📍 Địa điểm:</strong> <span id="modalLocation">--</span>
+                    </div>
+                    <div style="margin-bottom: 8px;">
+                        <strong>📅 Thời gian:</strong> <span id="modalPeriod">--</span>
+                    </div>
+                    <div>
+                        <strong>📊 Dữ liệu:</strong> TVDI (MODIS LST & NDVI)
+                    </div>
+                </div>
+
+                <div id="fetchProgress" style="display: none;">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill">0%</div>
+                    </div>
+                    <div class="log" id="fetchLog"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeFetchModal()">Hủy</button>
+                <button class="btn-primary" onclick="fetchFromGEE()" id="btnStartFetch">
+                    🚀 Bắt đầu tải
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API = 'http://localhost:3000/api';
+        const PYTHON_API = 'http://localhost:3001'; 
+        let charts = {};
+        let geeOnline = false;
+
+        // Kiểm tra GEE service
+        async function checkGEEStatus() {
+            try {
+                const res = await fetch(`${API}/gee/status`);
+                const data = await res.json();
+                
+                const statusEl = document.getElementById('geeStatus');
+                if (data.status === 'online' && data.gee_initialized) {
+                    statusEl.className = 'gee-status online';
+                    statusEl.innerHTML = '✅ GEE Service: Online - Sẵn sàng tải dữ liệu';
+                    geeOnline = true;
+                    document.getElementById('btnFetch').disabled = false;
+                } else {
+                    statusEl.className = 'gee-status offline';
+                    statusEl.innerHTML = '❌ GEE Service: Offline - Vui lòng chạy: python api_server.py';
+                    geeOnline = false;
+                    document.getElementById('btnFetch').disabled = true;
+                }
+            } catch (err) {
+                const statusEl = document.getElementById('geeStatus');
+                statusEl.className = 'gee-status offline';
+                statusEl.innerHTML = '❌ GEE Service: Không kết nối được - Chạy: python api_server.py';
+                geeOnline = false;
+                document.getElementById('btnFetch').disabled = true;
+            }
+        }
+
+        // Mở modal
+        function openFetchModal() {
+            if (!geeOnline) {
+                alert('GEE Service chưa sẵn sàng. Vui lòng chạy: python api_server.py');
+                return;
+            }
+            
+            const locationEl = document.getElementById('location');
+            const locationName = locationEl.options[locationEl.selectedIndex].text;
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+            
+            document.getElementById('modalLocation').textContent = locationName;
+            document.getElementById('modalPeriod').textContent = `${start} đến ${end}`;
+            document.getElementById('fetchModal').classList.add('show');
+        }
+
+        function closeFetchModal() {
+            document.getElementById('fetchModal').classList.remove('show');
+            document.getElementById('fetchProgress').style.display = 'none';
+            document.getElementById('progressFill').style.width = '0%';
+            document.getElementById('fetchLog').innerHTML = '';
+        }
+
+        // Tải dữ liệu từ GEE
+        async function fetchFromGEE() {
+            const locationEl = document.getElementById('location');
+            const location_id = locationEl.value;
+            const province = locationEl.options[locationEl.selectedIndex].dataset.province;
+            const start_date = document.getElementById('startDate').value;
+            const end_date = document.getElementById('endDate').value;
+
+            // Show progress
+            document.getElementById('fetchProgress').style.display = 'block';
+            document.getElementById('btnStartFetch').disabled = true;
+            
+            const logEl = document.getElementById('fetchLog');
+            const progressFill = document.getElementById('progressFill');
+            
+            logEl.innerHTML = '<div class="log-item">⏳ Đang kết nối với GEE...</div>';
+            progressFill.style.width = '10%';
+            progressFill.textContent = '10%';
+
+            try {
+                logEl.innerHTML += '<div class="log-item">🌍 Đang truy vấn dữ liệu MODIS...</div>';
+                progressFill.style.width = '30%';
+                progressFill.textContent = '30%';
+
+                const response = await fetch(`${API}/gee/fetch`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        province,
+                        location_id: parseInt(location_id),
+                        start_date,
+                        end_date,
+                        data_types: ['tvdi']
+                    })
+                });
+
+                progressFill.style.width = '60%';
+                progressFill.textContent = '60%';
+                logEl.innerHTML += '<div class="log-item">💾 Đang lưu vào database...</div>';
+
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    progressFill.style.width = '100%';
+                    progressFill.textContent = '100%';
+                    
+                    const records = result.results.tvdi?.records || 0;
+                    logEl.innerHTML = `
+                        <div class="log-item">✅ Hoàn thành!</div>
+                        <div class="log-item">📊 Đã tải: ${records} bản ghi TVDI</div>
+                        <div class="log-item">📍 Khu vực: ${result.province}</div>
+                        <div class="log-item">📅 Thời gian: ${result.period}</div>
+                    `;
+
+                    setTimeout(() => {
+                        closeFetchModal();
+                        loadData();
+                    }, 2000);
+                } else {
+                    throw new Error(result.error || result.message || 'Unknown error');
+                }
+
+            } catch (err) {
+                progressFill.style.width = '0%';
+                progressFill.textContent = '0%';
+                logEl.innerHTML = `<div class="log-item" style="color: #f44336;">❌ Lỗi: ${err.message}</div>`;
+                
+                if (err.message.includes('ECONNREFUSED')) {
+                    logEl.innerHTML += '<div class="log-item" style="color: #ffa726;">⚠️ Python API không chạy. Vui lòng chạy: python api_server.py</div>';
+                }
+            } finally {
+                document.getElementById('btnStartFetch').disabled = false;
+            }
+        }
+
+        async function loadData() {
+            const locId = document.getElementById('location').value;
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+            const year = start.split('-')[0];
+
+            try {
+                const [daily, monthly] = await Promise.all([
+                    fetch(`${API}/tvdi?location_id=${locId}&start=${start}&end=${end}`).then(r=>r.json()),
+                    fetch(`${API}/tvdi/monthly?location_id=${locId}&year=${year}`).then(r=>r.json())
+                ]);
+
+                updateStats(daily.statistics);
+                updateAlert(daily.statistics);
+                drawTvdiChart(daily.data);
+                drawMonthlyChart(monthly.monthly_data);
+                drawClassChart(daily.data);
+
+            } catch (err) {
+                console.error('Error:', err);
+                alert('Lỗi khi tải dữ liệu. Có thể chưa có dữ liệu cho khoảng thời gian này.');
+            }
+        }
+
+        function updateStats(stats) {
+            document.getElementById('avgTvdi').textContent = stats.average;
+            document.getElementById('avgLst').textContent = stats.avg_lst + '°';
+            document.getElementById('droughtPct').textContent = stats.drought_pct + '%';
+            document.getElementById('severeDays').textContent = stats.drought_days;
+        }
+
+        function updateAlert(stats) {
+    const tvdi = parseFloat(stats.average);
+    let level, levelClass, desc, detail;
+    
+    if (tvdi < 0.2) {
+        level = 'ẨM ƯỚT';
+        levelClass = 'level-wet';
+        desc = 'Điều kiện ẩm ướt - Không có nguy cơ hạn hán';
+        detail = `
+            <strong>Mô tả chi tiết:</strong><br>
+            • Đất đang trong trạng thái ẩm dồi dào, hầu hết bề mặt đất bão hòa nước<br>
+            • Nhiệt độ đất thấp, quá trình bốc hơi diễn ra chậm<br>
+            • Thực vật phát triển mạnh, tán lá xanh, độ ẩm không khí cao<br><br>
+            <strong>Khuyến nghị:</strong> Tận dụng giai đoạn này để gieo trồng, chăm sóc hoặc phục hồi đất. Kiểm tra thoát nước nếu mưa kéo dài.
+        `;
+    } else if (tvdi < 0.4) {
+        level = 'BÌNH THƯỜNG';
+        levelClass = 'level-normal';
+        desc = 'Điều kiện thời tiết bình thường';
+        detail = `
+            <strong>Mô tả chi tiết:</strong><br>
+            • Độ ẩm đất ở mức ổn định, không quá khô cũng không quá ẩm<br>
+            • Cân bằng nước - nhiệt tốt, cây trồng không gặp stress nước<br>
+            • Mật độ thực vật ổn định, NDVI dao động mức trung bình - khá<br><br>
+            <strong>Khuyến nghị:</strong> Tiếp tục duy trì tưới tiêu theo mức thông thường. Theo dõi vùng đất cát vì dễ chuyển sang khô hạn.
+        `;
+    } else if (tvdi < 0.6) {
+        level = 'HẠN NHẸ';
+        levelClass = 'level-moderate';
+        desc = 'Cần theo dõi sát sao - Có thể ảnh hưởng đến cây trồng';
+        detail = `
+            <strong>Mô tả chi tiết:</strong><br>
+            • Độ ẩm đất bắt đầu giảm, bề mặt đất nóng nhanh hơn<br>
+            • Cây trồng có dấu hiệu giảm sinh trưởng nhẹ (vàng lá nhẹ, cuốn lá)<br>
+            • Khả năng giữ nước của đất thấp hơn, bốc hơi nhanh khi nhiệt độ cao<br><br>
+            <strong>Cảnh báo:</strong> Nếu không có mưa 5-7 ngày → dễ chuyển thành hạn cục bộ<br>
+            <strong>Khuyến nghị:</strong> Bắt đầu tăng tần suất tưới cho nông nghiệp. Đánh giá nguồn nước tưới.
+        `;
+    } else if (tvdi < 0.8) {
+        level = 'HẠN NẶNG';
+        levelClass = 'level-severe';
+        desc = '⚠️ Cảnh báo nghiêm trọng! Cần có biện pháp ứng phó ngay';
+        detail = `
+            <strong>Mô tả chi tiết:</strong><br>
+            • Đất mất ẩm rõ rệt, bề mặt xuất hiện nứt nẻ<br>
+            • Cây trồng stress nước mạnh, sinh trưởng chậm<br>
+            • Bốc hơi rất cao do nhiệt độ đất cao, màu sắc thực vật nhạt dần<br><br>
+            <strong>Ảnh hưởng:</strong><br>
+            • Giảm năng suất 15-30%<br>
+            • Cà phê, hồ tiêu, sắn, lúa có nguy cơ khô héo<br>
+            • Nguy cơ cháy rừng tăng đáng kể<br><br>
+            <strong>Khuyến nghị:</strong> Áp dụng tưới nhỏ giọt. Ưu tiên nước cho vùng sản xuất tập trung. Cảnh báo cháy rừng mức cao.
+        `;
+    } else {
+        level = 'HẠN CỰC ĐOAN';
+        levelClass = 'level-extreme';
+        desc = '🆘 Tình trạng khẩn cấp! Thiệt hại nghiêm trọng';
+        detail = `
+            <strong>Mô tả chi tiết:</strong><br>
+            • Đất ở trạng thái khô kiệt, gần như không còn ẩm bề mặt<br>
+            • Nhiệt độ đất cao, thậm chí trên 50°C<br>
+            • Cây trồng chậm phát triển hoặc chết hàng loạt nếu kéo dài<br>
+            • Đất dễ thoái hóa, mất chất hữu cơ<br><br>
+            <strong>Ảnh hưởng:</strong><br>
+            • Giảm năng suất >40%<br>
+            • Nguy cơ cháy rừng rất cao<br>
+            • Đe dọa nghiêm trọng hệ sinh thái<br>
+            • Nguồn nước sinh hoạt bị ảnh hưởng<br><br>
+            <strong>Khuyến nghị KHẨN CẤP:</strong><br>
+            • Ưu tiên nước cho sinh hoạt trước nông nghiệp<br>
+            • Dừng hoặc giãn lịch gieo trồng vụ mới<br>
+            • Tạo đường băng cản lửa ở rừng<br>
+            • Công bố cảnh báo hạn mặn/hạn hán cấp tỉnh
+        `;
+    }
+
+    document.getElementById('alertBanner').style.display = 'block';
+    const levelEl = document.getElementById('droughtLevel');
+    levelEl.textContent = level;
+    levelEl.className = 'drought-level ' + levelClass;
+    document.getElementById('droughtDesc').innerHTML = desc + '<br><br>' + detail;
+}
+
+        function drawTvdiChart(data) {
+            const ctx = document.getElementById('tvdiChart');
+            if (charts.tvdi) charts.tvdi.destroy();
+
+            const backgroundColors = data.map(d => {
+                const val = parseFloat(d.tvdi_mean);
+                if (val < 0.2) return '#2166ac';
+                if (val < 0.4) return '#67a9cf';
+                if (val < 0.6) return '#fddbc7';
+                if (val < 0.8) return '#ef8a62';
+                return '#b2182b';
+            });
+
+            charts.tvdi = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.map(d => d.date),
+                    datasets: [{
+                        label: 'TVDI',
+                        data: data.map(d => d.tvdi_mean),
+                        borderColor: '#ff8c42',
+                        backgroundColor: 'rgba(255,140,66,0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        pointBackgroundColor: backgroundColors,
+                        pointBorderColor: backgroundColors,
+                        pointRadius: 3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { labels: { color: '#fff' } }
+                    },
+                    scales: {
+                        x: { 
+                            ticks: { color: '#999', maxTicksLimit: 15 },
+                            grid: { color: 'rgba(255,255,255,0.1)' }
+                        },
+                        y: { 
+                            ticks: { color: '#999' },
+                            grid: { color: 'rgba(255,255,255,0.1)' },
+                            min: 0,
+                            max: 1
+                        }
+                    }
+                }
+            });
+        }
+
+        function drawMonthlyChart(data) {
+            const ctx = document.getElementById('monthlyChart');
+            if (charts.monthly) charts.monthly.destroy();
+
+            const monthNames = ['T1','T2','T3','T4','T5','T6','T7','T8','T9','T10','T11','T12'];
+
+            charts.monthly = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: data.map(d => monthNames[d.month - 1]),
+                    datasets: [{
+                        label: 'TVDI TB',
+                        data: data.map(d => d.avg_tvdi),
+                        backgroundColor: data.map(d => {
+                            const val = parseFloat(d.avg_tvdi);
+                            if (val < 0.2) return '#2166ac';
+                            if (val < 0.4) return '#67a9cf';
+                            if (val < 0.6) return '#fddbc7';
+                            if (val < 0.8) return '#ef8a62';
+                            return '#b2182b';
+                        })
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { labels: { color: '#fff' } } },
+                    scales: {
+                        x: { ticks: { color: '#999' }, grid: { display: false } },
+                        y: { 
+                            ticks: { color: '#999' },
+                            grid: { color: 'rgba(255,255,255,0.1)' },
+                            min: 0,
+                            max: 1
+                        }
+                    }
+                }
+            });
+        }
+
+        function drawClassChart(data) {
+            const ctx = document.getElementById('classChart');
+            if (charts.class) charts.class.destroy();
+
+            const classes = { wet: 0, normal: 0, moderate: 0, severe: 0, extreme: 0 };
+            data.forEach(d => {
+                const val = parseFloat(d.tvdi_mean);
+                if (val < 0.2) classes.wet++;
+                else if (val < 0.4) classes.normal++;
+                else if (val < 0.6) classes.moderate++;
+                else if (val < 0.8) classes.severe++;
+                else classes.extreme++;
+            });
+
+            charts.class = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Ẩm ướt', 'Bình thường', 'Hạn nhẹ', 'Hạn nặng', 'Hạn cực đoan'],
+                    datasets: [{
+                        data: [classes.wet, classes.normal, classes.moderate, classes.severe, classes.extreme],
+                        backgroundColor: ['#2166ac', '#67a9cf', '#fddbc7', '#ef8a62', '#b2182b']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { 
+                            position: 'bottom',
+                            labels: { color: '#fff' }
+                        }
+                    }
+                }
+            });
+        }
+
+        async function loadLocations() {
+            try {
+                const res = await fetch(`${API}/locations`);
+                const data = await res.json();
+                const sel = document.getElementById('location');
+                sel.innerHTML = data.map(l => 
+                    `<option value="${l.id}" data-province="${l.province}">${l.name}</option>`
+                ).join('');
+            } catch (e) { 
+                console.log('Using default location'); 
+            }
+        }
+
+        // Init
+        window.onload = async () => {
+            const isValid = await AuthHelper.verifyToken();
+            if (!isValid) {
+                window.location.href = 'login.html';
+                return;
+            }
+            loadLocations();
+            checkGEEStatus();
+            setInterval(checkGEEStatus, 30000);
+            
+            // Log activity
+            await AuthHelper.logActivity('page_view', 'tvdi');
+        };
+    </script>
+     <script src="js/auth.js"></script>
+</body>
+</html>

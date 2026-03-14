@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phân tích NDVI - Thảm thực vật - Web GIS</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            color: #fff;
+        }
+        
+        nav {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            padding: 15px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .nav-container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        #userInfo {
+            margin-left: auto;
+        }
+
+        #userInfo button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 0.9em;
+        }
+
+        #userInfo button:hover {
+            background: rgba(255,107,107,0.3);
+            transform: translateY(-2px);
+        }
+        .logo {
+            font-size: 1.5em;
+            font-weight: bold;
+            background: linear-gradient(90deg, #00d9ff, #00ff88);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .nav-links {
+            display: flex;
+            gap: 20px;
+            list-style: none;
+        }
+        .nav-links a {
+            color: rgba(255,255,255,0.8);
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            transition: all 0.3s;
+        }
+        .nav-links a:hover, .nav-links a.active {
+            background: rgba(255,255,255,0.1);
+            color: #ff8c42;
+        }
+
+        .container { max-width: 1600px; margin: 0 auto; padding: 20px; }
+        
+        .page-header {
+            background: rgba(255,255,255,0.05);
+            backdrop-filter: blur(10px);
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            border-left: 4px solid #00ff88;
+        }
+        .page-title {
+            font-size: 2em;
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .page-subtitle { color: rgba(255,255,255,0.7); }
+
+        .gee-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 0.9em;
+            margin-top: 15px;
+        }
+        .gee-status.online {
+            background: rgba(76, 175, 80, 0.2);
+            border: 1px solid rgba(76, 175, 80, 0.5);
+            color: #4caf50;
+        }
+        .gee-status.offline {
+            background: rgba(244, 67, 54, 0.2);
+            border: 1px solid rgba(244, 67, 54, 0.5);
+            color: #f44336;
+        }
+
+        .controls {
+            background: rgba(255,255,255,0.05);
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .control-row { display: flex; gap: 15px; flex-wrap: wrap; align-items: flex-end; }
+        .form-group { display: flex; flex-direction: column; min-width: 150px; }
+        .form-group label { font-size: 0.85em; color: rgba(255,255,255,0.7); margin-bottom: 5px; }
+        select, input {
+            padding: 10px 12px;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 8px;
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            font-size: 0.95em;
+        }
+        select option { background: #1a1a2e; color: #fff; }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn-primary { 
+            background: linear-gradient(135deg, #00ff88, #00d9ff); 
+            color: #001219;
+        }
+        .btn-secondary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+        button:hover { 
+            transform: translateY(-2px); 
+            box-shadow: 0 5px 20px rgba(0,255,136,0.4); 
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal.show { display: flex; }
+        .modal-content {
+            background: #1a1a2e;
+            padding: 30px;
+            border-radius: 15px;
+            max-width: 500px;
+            width: 90%;
+            border: 2px solid #00ff88;
+        }
+        .modal-title {
+            font-size: 1.5em;
+            margin-bottom: 20px;
+            color: #00ff88;
+        }
+        .modal-body { margin-bottom: 20px; }
+        .modal-footer { display: flex; gap: 10px; justify-content: flex-end; }
+
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            overflow: hidden;
+            margin: 15px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00ff88, #00d9ff);
+            width: 0%;
+            transition: width 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+
+        .log {
+            background: rgba(0,0,0,0.3);
+            padding: 15px;
+            border-radius: 8px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+            margin-top: 15px;
+        }
+        .log-item {
+            padding: 5px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .alert-banner {
+            background: linear-gradient(135deg, rgba(0,255,136,0.2), rgba(0,217,255,0.2));
+            border: 2px solid #00ff88;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .alert-title { font-size: 1.3em; font-weight: bold; margin-bottom: 10px; color: #00ff88; }
+        .veg-level {
+            display: inline-block;
+            padding: 10px 25px;
+            border-radius: 25px;
+            font-weight: bold;
+            font-size: 1.2em;
+            margin: 10px 0;
+        }
+        .level-water { background: #0571b0; }
+        .level-bare { background: #ca0020; }
+        .level-sparse { background: #f4a582; color:#333; }
+        .level-moderate { background: #92c5de; color:#333; }
+        .level-dense { background: #4dac26; }
+        .level-very-dense { background: #1b7837; }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-left: 4px solid #00ff88;
+        }
+        .stat-icon { font-size: 2em; margin-bottom: 10px; }
+        .stat-value { font-size: 2em; font-weight: bold; margin-bottom: 5px; color: #00ff88; }
+        .stat-label { font-size: 0.9em; color: rgba(255,255,255,0.6); }
+        
+        .dashboard { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 20px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .card-title {
+            font-size: 1.2em;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .full-width { grid-column: 1 / -1; }
+        canvas { max-height: 350px; }
+
+        .legend {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin-top: 15px;
+            justify-content: center;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9em;
+        }
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+        }
+        #vegDesc {
+            margin-top: 15px;
+            color: rgba(255,255,255,0.95);
+            text-align: left;
+            line-height: 1.8;
+            padding: 15px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            font-size: 0.95em;
+        }
+
+        #vegDesc strong {
+            color: #00ff88;
+            display: block;
+            margin-top: 10px;
+            margin-bottom: 5px;
+        }
+        @media (max-width: 768px) {
+            .dashboard { grid-template-columns: 1fr; }
+            .control-row { flex-direction: column; }
+            .nav-links { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <div class="nav-container">
+            <div class="logo" style="margin-right: 30px;">🌍 Trang chủ </div>
+            <ul class="nav-links">
+                <li><a href="index.html" >Trang chủ</a></li>
+                <li><a href="rainfall.html">Lượng mưa</a></li>
+                <li><a href="temperature.html">Nhiệt độ</a></li>
+                <li><a href="ndvi.html" class="active">NDVI</a></li>
+                <li><a href="tvdi.html">TVDI</a></li>
+            </ul>
+            <div id="userInfo"></div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="page-header">
+            <div class="page-title">🌱 Phân tích NDVI - Thảm thực vật</div>
+            <p class="page-subtitle">Normalized Difference Vegetation Index (MODIS)</p>
+            <div id="geeStatus" class="gee-status offline">
+                ⏳ Đang kiểm tra GEE service...
+            </div>
+        </div>
+
+        <div class="controls">
+            <div class="control-row">
+                <div class="form-group">
+                    <label>📍 Địa điểm</label>
+                    <select id="location">
+                        <option value="1" data-province="Quang Tri">Quảng Trị</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>📅 Từ ngày</label>
+                    <input type="date" id="startDate" value="2020-01-01">
+                </div>
+                <div class="form-group">
+                    <label>📅 Đến ngày</label>
+                    <input type="date" id="endDate" value="2020-12-31">
+                </div>
+                <button class="btn-secondary" onclick="openFetchModal()" id="btnFetch">
+                    🌍 Tải từ GEE
+                </button>
+                <button class="btn-primary" onclick="loadData()">
+                    🔍 Phân tích
+                </button>
+            </div>
+        </div>
+
+        <div id="alertBanner" class="alert-banner" style="display:none;">
+            <div class="alert-title">🌿 MỨC ĐỘ CHE PHỦ THỰC VẬT</div>
+            <div class="veg-level" id="vegLevel">--</div>
+            <p id="vegDesc" style="margin-top:10px; color:rgba(255,255,255,0.9);">--</p>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon">📊</div>
+                <div class="stat-value" id="avgNdvi">--</div>
+                <div class="stat-label">NDVI trung bình</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">📉</div>
+                <div class="stat-value" id="minNdvi">--</div>
+                <div class="stat-label">NDVI thấp nhất</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">📈</div>
+                <div class="stat-value" id="maxNdvi">--</div>
+                <div class="stat-label">NDVI cao nhất</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">🌳</div>
+                <div class="stat-value" id="vegAreaPct">--</div>
+                <div class="stat-label">Diện tích có thảm thực vật (%)</div>
+            </div>
+        </div>
+
+        <div class="dashboard">
+            <div class="card full-width">
+                <div class="card-title">📈 NDVI theo thời gian</div>
+                <canvas id="ndviChart"></canvas>
+                <div class="legend">
+                    <div class="legend-item"><div class="legend-color" style="background:#0571b0"></div>Nước / Không thực vật (&lt; 0)</div>
+                    <div class="legend-item"><div class="legend-color" style="background:#ca0020"></div>Đất trống (0 - 0.1)</div>
+                    <div class="legend-item"><div class="legend-color" style="background:#f4a582"></div>Thực vật thưa (0.1 - 0.2)</div>
+                    <div class="legend-item"><div class="legend-color" style="background:#92c5de"></div>Thực vật vừa (0.2 - 0.4)</div>
+                    <div class="legend-item"><div class="legend-color" style="background:#4dac26"></div>Thực vật dày (0.4 - 0.6)</div>
+                    <div class="legend-item"><div class="legend-color" style="background:#1b7837"></div>Thực vật rất dày (&gt; 0.6)</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">📊 Thống kê NDVI theo tháng</div>
+                <canvas id="monthlyChart"></canvas>
+            </div>
+
+            <div class="card">
+                <div class="card-title">🌿 Phân bố lớp NDVI</div>
+                <canvas id="classChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Fetch từ GEE -->
+    <div id="fetchModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-title">🌍 Tải dữ liệu NDVI từ Google Earth Engine</div>
+            <div class="modal-body">
+                <p style="color: rgba(255,255,255,0.7); margin-bottom: 15px;">
+                    🌱 Tải dữ liệu NDVI cho khoảng thời gian đã chọn (MODIS)
+                </p>
+                <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                    <div style="margin-bottom: 8px;">
+                        <strong>📍 Địa điểm:</strong> <span id="modalLocation">--</span>
+                    </div>
+                    <div style="margin-bottom: 8px;">
+                        <strong>📅 Thời gian:</strong> <span id="modalPeriod">--</span>
+                    </div>
+                    <div>
+                        <strong>📊 Dữ liệu:</strong> NDVI (Mean, Min, Max, Vegetation Area %)
+                    </div>
+                </div>
+
+                <div id="fetchProgress" style="display: none;">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill">0%</div>
+                    </div>
+                    <div class="log" id="fetchLog"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeFetchModal()">Hủy</button>
+                <button class="btn-primary" onclick="fetchFromGEE()" id="btnStartFetch">
+                    🚀 Bắt đầu tải
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API = 'http://localhost:3000/api';
+        const PYTHON_API = 'http://localhost:3001';
+        let charts = {};
+        let geeOnline = false;
+
+        // Kiểm tra GEE service
+        async function checkGEEStatus() {
+            try {
+                const res = await fetch(`${PYTHON_API}/status`);
+                const data = await res.json();
+                
+                const statusEl = document.getElementById('geeStatus');
+                if (data.status === 'online' && data.gee_initialized) {
+                    statusEl.className = 'gee-status online';
+                    statusEl.innerHTML = '✅ GEE Service: Online - Sẵn sàng tải dữ liệu';
+                    geeOnline = true;
+                    document.getElementById('btnFetch').disabled = false;
+                } else {
+                    statusEl.className = 'gee-status offline';
+                    statusEl.innerHTML = '❌ GEE Service: Offline - Vui lòng chạy: python api_server.py';
+                    geeOnline = false;
+                    document.getElementById('btnFetch').disabled = true;
+                }
+            } catch (err) {
+                const statusEl = document.getElementById('geeStatus');
+                statusEl.className = 'gee-status offline';
+                statusEl.innerHTML = '❌ GEE Service: Không kết nối được - Chạy: python api_server.py';
+                geeOnline = false;
+                document.getElementById('btnFetch').disabled = true;
+            }
+        }
+
+        function openFetchModal() {
+            if (!geeOnline) {
+                alert('GEE Service chưa sẵn sàng. Vui lòng chạy: python api_server.py');
+                return;
+            }
+            
+            const locationEl = document.getElementById('location');
+            const locationName = locationEl.options[locationEl.selectedIndex].text;
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+            
+            document.getElementById('modalLocation').textContent = locationName;
+            document.getElementById('modalPeriod').textContent = `${start} đến ${end}`;
+            document.getElementById('fetchModal').classList.add('show');
+        }
+
+        function closeFetchModal() {
+            document.getElementById('fetchModal').classList.remove('show');
+            document.getElementById('fetchProgress').style.display = 'none';
+            document.getElementById('progressFill').style.width = '0%';
+            document.getElementById('fetchLog').innerHTML = '';
+        }
+
+        // Tải dữ liệu từ GEE
+        async function fetchFromGEE() {
+            const locationEl = document.getElementById('location');
+            const location_id = locationEl.value;
+            const province = locationEl.options[locationEl.selectedIndex].dataset.province;
+            const start_date = document.getElementById('startDate').value;
+            const end_date = document.getElementById('endDate').value;
+
+            document.getElementById('fetchProgress').style.display = 'block';
+            document.getElementById('btnStartFetch').disabled = true;
+            
+            const logEl = document.getElementById('fetchLog');
+            const progressFill = document.getElementById('progressFill');
+            
+            logEl.innerHTML = '<div class="log-item">⏳ Đang kết nối với GEE...</div>';
+            progressFill.style.width = '10%';
+            progressFill.textContent = '10%';
+
+            try {
+                logEl.innerHTML += '<div class="log-item">🌍 Đang truy vấn dữ liệu NDVI...</div>';
+                progressFill.style.width = '30%';
+                progressFill.textContent = '30%';
+
+                const response = await fetch(`${PYTHON_API}/fetch-data`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        province,
+                        location_id: parseInt(location_id),
+                        start_date,
+                        end_date,
+                        data_types: ['ndvi']
+                    })
+                });
+
+                progressFill.style.width = '60%';
+                progressFill.textContent = '60%';
+                logEl.innerHTML += '<div class="log-item">💾 Đang lưu vào database...</div>';
+
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    progressFill.style.width = '100%';
+                    progressFill.textContent = '100%';
+                    
+                    const records = result.results.ndvi?.records || 0;
+                    logEl.innerHTML = `
+                        <div class="log-item">✅ Hoàn thành!</div>
+                        <div class="log-item">📊 Đã tải: ${records} bản ghi NDVI</div>
+                        <div class="log-item">📍 Khu vực: ${result.province}</div>
+                        <div class="log-item">📅 Thời gian: ${result.period}</div>
+                    `;
+
+                    setTimeout(() => {
+                        closeFetchModal();
+                        loadData();
+                    }, 2000);
+                } else {
+                    throw new Error(result.error || result.message || 'Unknown error');
+                }
+
+            } catch (err) {
+                progressFill.style.width = '0%';
+                progressFill.textContent = '0%';
+                logEl.innerHTML = `<div class="log-item" style="color: #f44336;">❌ Lỗi: ${err.message}</div>`;
+                
+                if (err.message.includes('ECONNREFUSED') || err.message.includes('Failed to fetch')) {
+                    logEl.innerHTML += '<div class="log-item" style="color: #ffa726;">⚠️ Python API không chạy. Vui lòng chạy: python api_server.py</div>';
+                }
+            } finally {
+                document.getElementById('btnStartFetch').disabled = false;
+            }
+        }
+
+        async function loadData() {
+            const locId = document.getElementById('location').value;
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+            const year = start.split('-')[0];
+
+            try {
+                const [daily, monthly] = await Promise.all([
+                    fetch(`${API}/ndvi?location_id=${locId}&start=${start}&end=${end}`).then(r=>r.json()),
+                    fetch(`${API}/ndvi/monthly?location_id=${locId}&year=${year}`).then(r=>r.json())
+                ]);
+
+                updateStats(daily.statistics);
+                updateAlert(daily.statistics);
+                drawNdviChart(daily.data);
+                drawMonthlyChart(monthly.monthly_data);
+                drawClassChart(daily.data);
+
+            } catch (err) {
+                console.error('Error:', err);
+                alert('Lỗi khi tải dữ liệu NDVI. Có thể chưa có dữ liệu cho khoảng thời gian này.');
+            }
+        }
+
+        function updateStats(stats) {
+            document.getElementById('avgNdvi').textContent = stats.average || '--';
+            document.getElementById('minNdvi').textContent = stats.min || '--';
+            document.getElementById('maxNdvi').textContent = stats.max || '--';
+            // Sửa tên trường: avg_veg_pct hoặc avg_vegetation_pct
+            const vegPct = stats.avg_veg_pct || stats.avg_vegetation_pct || '--';
+            document.getElementById('vegAreaPct').textContent = vegPct + (vegPct !== '--' ? '%' : '');
+        }
+
+        function classifyNdvi(value) {
+            const v = parseFloat(value);
+            if (isNaN(v)) return { level: 'unknown', label: 'Không có dữ liệu - nhấn tải từ GEE ', color: '#999', css: '' };
+            if (v < 0) return { level: 'water', label: 'Nước / Không thực vật', color: '#0571b0', css: 'level-water' };
+            if (v < 0.1) return { level: 'bare', label: 'Đất trống', color: '#ca0020', css: 'level-bare' };
+            if (v < 0.2) return { level: 'sparse', label: 'Thực vật thưa', color: '#f4a582', css: 'level-sparse' };
+            if (v < 0.4) return { level: 'moderate', label: 'Thực vật vừa', color: '#92c5de', css: 'level-moderate' };
+            if (v < 0.6) return { level: 'dense', label: 'Thực vật dày', color: '#4dac26', css: 'level-dense' };
+            return { level: 'very_dense', label: 'Thực vật rất dày', color: '#1b7837', css: 'level-very-dense' };
+        }
+
+       function updateAlert(stats) {
+    const ndvi = parseFloat(stats.average);
+    const cls = classifyNdvi(ndvi);
+
+    document.getElementById('alertBanner').style.display = 'block';
+    const levelEl = document.getElementById('vegLevel');
+    levelEl.textContent = cls.label.toUpperCase();
+    levelEl.className = 'veg-level ' + cls.css;
+
+    let desc = '';
+    if (cls.level === 'water') {
+        desc = `
+            <strong>📌 Mô tả:</strong> NDVI âm nghĩa là không có thực vật, phản xạ đặc trưng của nước, ao hồ, sông suối, đầm phá.<br><br>
+            <strong>🌿 Tình trạng:</strong> Không có thảm thực vật. Khu vực giữ ẩm tốt, hạ nhiệt độ khu vực xung quanh.<br><br>
+            <strong>💡 Ứng dụng:</strong> Phân định mặt nước, theo dõi biến động mực nước mùa mưa-mùa khô.
+        `;
+    } else if (cls.level === 'bare') {
+        desc = `
+            <strong>📌 Mô tả:</strong> NDVI rất thấp → bề mặt ít hoặc không có cây xanh. Khu dân cư, công trình, đất cát trống.<br><br>
+            <strong>🔥 Cảnh báo:</strong><br>
+            • Hiệu ứng đảo nhiệt đô thị cao<br>
+            • Bốc hơi thấp → đất dễ nóng lên<br>
+            • Nguy cơ thoái hóa đất nếu là vùng nông nghiệp bỏ hoang<br><br>
+            <strong>💡 Khuyến nghị:</strong> Cần theo dõi, nguy cơ xói mòn và suy thoái đất cao.
+        `;
+    } else if (cls.level === 'sparse') {
+        desc = `
+            <strong>📌 Mô tả:</strong> NDVI trung bình → có cây xanh nhưng không dày đặc. Đồng cỏ, cây bụi, vùng trồng trọt thưa.<br><br>
+            <strong>🌿 Tình trạng:</strong> Có lớp phủ thực vật nhưng khả năng điều tiết nhiệt chỉ ở mức vừa. Độ ẩm đất phụ thuộc lớn vào lượng mưa.<br><br>
+            <strong>💡 Tác động:</strong> Vùng nông nghiệp có thể đang bước sang giai đoạn khô hạn nhẹ. Vùng đất dốc dễ xảy ra xói mòn.
+        `;
+    } else if (cls.level === 'moderate') {
+        desc = `
+            <strong>📌 Mô tả:</strong> Thảm thực vật ở mức trung bình, phù hợp cho canh tác.<br><br>
+            <strong>🌿 Tình trạng:</strong> Cân bằng sinh thái tương đối tốt, cây trồng phát triển ổn định.<br><br>
+            <strong>💡 Khuyến nghị:</strong> Cần quản lý tốt nguồn nước và đất để duy trì năng suất.
+        `;
+    } else if (cls.level === 'dense') {
+        desc = `
+            <strong>📌 Mô tả:</strong> NDVI cao → sinh khối tốt, cây xanh dày đặc, rừng khỏe mạnh.<br><br>
+            <strong>🌱 Tình trạng:</strong><br>
+            • Điều kiện sinh thái tốt → khả năng giữ nước, giảm nhiệt độ khu vực<br>
+            • Chỉ số NDVI cao cho thấy hệ sinh thái ổn định<br>
+            • Tỷ lệ quang hợp cao<br><br>
+            <strong>💡 Tác động:</strong> Giúp giảm hiệu ứng đảo nhiệt, tạo vùng đệm sinh thái, bảo vệ đất.
+        `;
+    } else if (cls.level === 'very_dense') {
+        desc = `
+            <strong>📌 Mô tả:</strong> Thảm thực vật rất dày, khu vực rừng tốt hoặc sinh khối cao.<br><br>
+            <strong>🌱 Lợi ích:</strong><br>
+            • Giảm hiệu ứng đảo nhiệt mạnh<br>
+            • Tạo vùng đệm sinh thái quan trọng<br>
+            • Bảo vệ đất và hạn chế xói mòn hiệu quả<br>
+            • Duy trì nguồn nước ngầm tốt<br><br>
+            <strong>✅ Kết luận:</strong> Hệ sinh thái rất khỏe mạnh, cần được bảo tồn.
+        `;
+    }
+
+    document.getElementById('vegDesc').innerHTML = desc;
+}
+
+        function drawNdviChart(data) {
+            const ctx = document.getElementById('ndviChart');
+            if (charts.ndvi) charts.ndvi.destroy();
+
+            const pointColors = data.map(d => classifyNdvi(d.ndvi_mean).color);
+
+            charts.ndvi = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.map(d => d.date),
+                    datasets: [{
+                        label: 'NDVI trung bình',
+                        data: data.map(d => d.ndvi_mean),
+                        borderColor: '#00ff88',
+                        backgroundColor: 'rgba(0,255,136,0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        pointBackgroundColor: pointColors,
+                        pointBorderColor: pointColors,
+                        pointRadius: 3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { labels: { color: '#fff' } }
+                    },
+                    scales: {
+                        x: { 
+                            ticks: { color: '#999', maxTicksLimit: 15 },
+                            grid: { color: 'rgba(255,255,255,0.1)' }
+                        },
+                        y: { 
+                            ticks: { color: '#999' },
+                            grid: { color: 'rgba(255,255,255,0.1)' },
+                            min: -0.2,
+                            max: 1
+                        }
+                    }
+                }
+            });
+        }
+
+        function drawMonthlyChart(data) {
+            const ctx = document.getElementById('monthlyChart');
+            if (charts.monthly) charts.monthly.destroy();
+
+            const monthNames = ['T1','T2','T3','T4','T5','T6','T7','T8','T9','T10','T11','T12'];
+
+            charts.monthly = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: data.map(d => monthNames[d.month - 1]),
+                    datasets: [
+                        {
+                            label: 'NDVI TB',
+                            data: data.map(d => d.avg_ndvi),
+                            backgroundColor: data.map(d => classifyNdvi(d.avg_ndvi).color)
+                        },
+                        {
+                            label: 'Diện tích có thảm thực vật (%)',
+                            data: data.map(d => d.avg_veg_pct),
+                            type: 'line',
+                            yAxisID: 'y1',
+                            borderColor: '#00d9ff',
+                            backgroundColor: 'rgba(0,217,255,0.1)',
+                            tension: 0.3
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { labels: { color: '#fff' } } },
+                    scales: {
+                        x: { ticks: { color: '#999' }, grid: { display: false } },
+                        y: { 
+                            ticks: { color: '#999' },
+                            grid: { color: 'rgba(255,255,255,0.1)' },
+                            min: -0.2,
+                            max: 1
+                        },
+                        y1: {
+                            position: 'right',
+                            ticks: { color: '#00d9ff', callback: v=>v+'%' },
+                            grid: { display: false },
+                            min: 0,
+                            max: 100
+                        }
+                    }
+                }
+            });
+        }
+
+        function drawClassChart(data) {
+            const ctx = document.getElementById('classChart');
+            if (charts.class) charts.class.destroy();
+
+            const classes = { water: 0, bare: 0, sparse: 0, moderate: 0, dense: 0, very_dense: 0 };
+            data.forEach(d => {
+                const c = classifyNdvi(d.ndvi_mean).level;
+                if (classes[c] !== undefined) classes[c]++;
+            });
+
+            charts.class = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: [
+                        'Nước / Không thực vật',
+                        'Đất trống',
+                        'Thực vật thưa',
+                        'Thực vật vừa',
+                        'Thực vật dày',
+                        'Thực vật rất dày'
+                    ],
+                    datasets: [{
+                        data: [
+                            classes.water,
+                            classes.bare,
+                            classes.sparse,
+                            classes.moderate,
+                            classes.dense,
+                            classes.very_dense
+                        ],
+                        backgroundColor: ['#0571b0', '#ca0020', '#f4a582', '#92c5de', '#4dac26', '#1b7837']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { 
+                            position: 'bottom',
+                            labels: { color: '#fff' }
+                        }
+                    }
+                }
+            });
+        }
+
+        async function loadLocations() {
+            try {
+                const res = await fetch(`${API}/locations`);
+                const data = await res.json();
+                const sel = document.getElementById('location');
+                sel.innerHTML = data.map(l => 
+                    `<option value="${l.id}" data-province="${l.province}">${l.name}</option>`
+                ).join('');
+            } catch (e) { 
+                console.log('Using default location'); 
+            }
+        }
+
+      window.onload = async () => {
+            const isValid = await AuthHelper.verifyToken();
+            if (!isValid) {
+                window.location.href = 'login.html';
+                return;
+            }
+            loadLocations();
+            checkGEEStatus();
+            setInterval(checkGEEStatus, 30000);
+            
+            // Log activity
+            await AuthHelper.logActivity('page_view', 'ndvi');
+        };
+    </script>
+     <script src="js/auth.js"></script>
+</body>
+</html>

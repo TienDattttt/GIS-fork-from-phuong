@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phân tích Nhiệt độ - Web GIS</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            color: #fff;
+        }
+        
+        nav {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            padding: 15px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .nav-container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        #userInfo {
+            margin-left: auto;
+        }
+
+        #userInfo button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 0.9em;
+        }
+
+        #userInfo button:hover {
+            background: rgba(255,107,107,0.3);
+            transform: translateY(-2px);
+        }
+        .logo {
+            font-size: 1.5em;
+            font-weight: bold;
+            background: linear-gradient(90deg, #00d9ff, #00ff88);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .nav-links {
+            display: flex;
+            gap: 20px;
+            list-style: none;
+        }
+        .nav-links a {
+            color: rgba(255,255,255,0.8);
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            transition: all 0.3s;
+        }
+        .nav-links a:hover, .nav-links a.active {
+            background: rgba(255,255,255,0.1);
+            color: #ff6b6b;
+        }
+
+        .container { max-width: 1600px; margin: 0 auto; padding: 20px; }
+        
+        .page-header {
+            background: rgba(255,255,255,0.05);
+            backdrop-filter: blur(10px);
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            border-left: 4px solid #ff6b6b;
+        }
+        .page-title {
+            font-size: 2em;
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .page-subtitle { color: rgba(255,255,255,0.7); }
+
+        .gee-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 0.9em;
+            margin-top: 15px;
+        }
+        .gee-status.online {
+            background: rgba(76, 175, 80, 0.2);
+            border: 1px solid rgba(76, 175, 80, 0.5);
+            color: #4caf50;
+        }
+        .gee-status.offline {
+            background: rgba(244, 67, 54, 0.2);
+            border: 1px solid rgba(244, 67, 54, 0.5);
+            color: #f44336;
+        }
+
+        .controls {
+            background: rgba(255,255,255,0.05);
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .control-row { display: flex; gap: 15px; flex-wrap: wrap; align-items: flex-end; }
+        .form-group { display: flex; flex-direction: column; min-width: 150px; }
+        .form-group label { font-size: 0.85em; color: rgba(255,255,255,0.7); margin-bottom: 5px; }
+        select, input {
+            padding: 10px 12px;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 8px;
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            font-size: 0.95em;
+        }
+        select option { background: #1a1a2e; color: #fff; }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn-primary { 
+            background: linear-gradient(135deg, #ff6b6b, #ee5a6f); 
+            color: #fff;
+        }
+        .btn-secondary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+        button:hover { 
+            transform: translateY(-2px); 
+            box-shadow: 0 5px 20px rgba(255,107,107,0.4); 
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal.show { display: flex; }
+        .modal-content {
+            background: #1a1a2e;
+            padding: 30px;
+            border-radius: 15px;
+            max-width: 500px;
+            width: 90%;
+            border: 2px solid #ff6b6b;
+        }
+        .modal-title {
+            font-size: 1.5em;
+            margin-bottom: 20px;
+            color: #ff6b6b;
+        }
+        .modal-body { margin-bottom: 20px; }
+        .modal-footer { display: flex; gap: 10px; justify-content: flex-end; }
+
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            overflow: hidden;
+            margin: 15px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ff6b6b, #ee5a6f);
+            width: 0%;
+            transition: width 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+
+        .log {
+            background: rgba(0,0,0,0.3);
+            padding: 15px;
+            border-radius: 8px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+            margin-top: 15px;
+        }
+        .log-item {
+            padding: 5px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-left: 4px solid #ff6b6b;
+        }
+        .stat-icon { font-size: 2em; margin-bottom: 10px; }
+        .stat-value { font-size: 2em; font-weight: bold; margin-bottom: 5px; color: #ff6b6b; }
+        .stat-label { font-size: 0.9em; color: rgba(255,255,255,0.6); }
+        
+        .dashboard { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 20px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .card-title {
+            font-size: 1.2em;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .full-width { grid-column: 1 / -1; }
+        canvas { max-height: 350px; }
+
+        @media (max-width: 768px) {
+            .dashboard { grid-template-columns: 1fr; }
+            .control-row { flex-direction: column; }
+            .nav-links { display: none; }
+        }
+        .alert-banner {
+            background: linear-gradient(135deg, rgba(255,107,107,0.2), rgba(238,90,111,0.2));
+            border: 2px solid #ff6b6b;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .alert-title { 
+            font-size: 1.3em; 
+            font-weight: bold; 
+            margin-bottom: 10px; 
+            color: #ff6b6b; 
+        }
+        .temp-level {
+            display: inline-block;
+            padding: 10px 25px;
+            border-radius: 25px;
+            font-weight: bold;
+            font-size: 1.2em;
+            margin: 10px 0;
+        }
+        .level-cool { background: #4ecdc4; }
+        .level-normal { background: #95e1d3; color:#333; }
+        .level-warm { background: #feca57; color:#333; }
+        .level-hot { background: #ff6b6b; }
+        .level-extreme { background: #d73027; }
+
+        #tempDesc {
+            margin-top: 15px;
+            color: rgba(255,255,255,0.95);
+            text-align: left;
+            line-height: 1.8;
+            padding: 15px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            font-size: 0.95em;
+        }
+
+        #tempDesc strong {
+            color: #ff6b6b;
+            display: block;
+            margin-top: 10px;
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <div class="nav-container">
+            <div class="logo" style="margin-right: 30px;">🌍 Trang chủ </div>
+            <ul class="nav-links">
+                <li><a href="index.html"  >Trang chủ</a></li>
+                <li><a href="rainfall.html">Lượng mưa</a></li>
+                <li><a href="temperature.html" class="active">Nhiệt độ</a></li>
+                <li><a href="ndvi.html">NDVI</a></li>
+                <li><a href="tvdi.html">TVDI</a></li>
+            </ul>
+            <div id="userInfo"></div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="page-header">
+            <div class="page-title">🌡️ Phân tích Nhiệt độ</div>
+            <p class="page-subtitle">Dữ liệu từ ERA5 (ECMWF Reanalysis v5)</p>
+            <div id="geeStatus" class="gee-status offline">
+                ⏳ Đang kiểm tra GEE service...
+            </div>
+        </div>
+
+        <div class="controls">
+            <div class="control-row">
+                <div class="form-group">
+                    <label>📍 Địa điểm</label>
+                    <select id="location">
+                        <option value="1" data-province="Quang Tri">Quảng Trị</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>📅 Từ ngày</label>
+                    <input type="date" id="startDate" value="2020-01-01">
+                </div>
+                <div class="form-group">
+                    <label>📅 Đến ngày</label>
+                    <input type="date" id="endDate" value="2020-12-31">
+                </div>
+                <button class="btn-secondary" onclick="openFetchModal()" id="btnFetch">
+                    🌍 Tải từ GEE
+                </button>
+                <button class="btn-primary" onclick="loadData()">
+                    🔍 Phân tích
+                </button>
+            </div>
+        </div>
+        <div id="alertBanner" class="alert-banner" style="display:none;">
+            <div class="alert-title">🌡️ ĐÁNH GIÁ NHIỆT ĐỘ BỀ MẶT</div>
+            <div class="temp-level" id="tempLevel">--</div>
+            <p id="tempDesc" style="margin-top:10px; color:rgba(255,255,255,0.9);">--</p>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon">📊</div>
+                <div class="stat-value" id="avgTemp">--</div>
+                <div class="stat-label">Nhiệt độ TB (°C)</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">❄️</div>
+                <div class="stat-value" id="minTemp">--</div>
+                <div class="stat-label">Nhiệt độ thấp nhất (°C)</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">🔥</div>
+                <div class="stat-value" id="maxTemp">--</div>
+                <div class="stat-label">Nhiệt độ cao nhất (°C)</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">📈</div>
+                <div class="stat-value" id="tempRange">--</div>
+                <div class="stat-label">Biên độ nhiệt (°C)</div>
+            </div>
+        </div>
+
+        <div class="dashboard">
+            <div class="card full-width">
+                <div class="card-title">📈 Biểu đồ nhiệt độ theo thời gian</div>
+                <canvas id="dailyChart"></canvas>
+            </div>
+
+            <div class="card">
+                <div class="card-title">📊 Thống kê theo tháng</div>
+                <canvas id="monthlyChart"></canvas>
+            </div>
+
+            <div class="card">
+                <div class="card-title">🌡️ Biên độ nhiệt theo tháng</div>
+                <canvas id="rangeChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Fetch từ GEE -->
+    <div id="fetchModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-title">🌍 Tải dữ liệu Nhiệt độ từ Google Earth Engine</div>
+            <div class="modal-body">
+                <p style="color: rgba(255,255,255,0.7); margin-bottom: 15px;">
+                    🌡️ Tải dữ liệu nhiệt độ từ ERA5 cho khoảng thời gian đã chọn
+                </p>
+                <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                    <div style="margin-bottom: 8px;">
+                        <strong>📍 Địa điểm:</strong> <span id="modalLocation">--</span>
+                    </div>
+                    <div style="margin-bottom: 8px;">
+                        <strong>📅 Thời gian:</strong> <span id="modalPeriod">--</span>
+                    </div>
+                    <div>
+                        <strong>📊 Dữ liệu:</strong> Nhiệt độ (ERA5)
+                    </div>
+                </div>
+
+                <div id="fetchProgress" style="display: none;">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill">0%</div>
+                    </div>
+                    <div class="log" id="fetchLog"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeFetchModal()">Hủy</button>
+                <button class="btn-primary" onclick="fetchFromGEE()" id="btnStartFetch">
+                    🚀 Bắt đầu tải
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API = 'http://localhost:3000/api';
+        const PYTHON_API = 'http://localhost:3001';
+        let charts = {};
+        let geeOnline = false;
+
+        // Kiểm tra GEE service
+        async function checkGEEStatus() {
+            try {
+                const res = await fetch(`${API}/gee/status`);
+                const data = await res.json();
+                
+                const statusEl = document.getElementById('geeStatus');
+                if (data.status === 'online' && data.gee_initialized) {
+                    statusEl.className = 'gee-status online';
+                    statusEl.innerHTML = '✅ GEE Service: Online - Sẵn sàng tải dữ liệu';
+                    geeOnline = true;
+                    document.getElementById('btnFetch').disabled = false;
+                } else {
+                    statusEl.className = 'gee-status offline';
+                    statusEl.innerHTML = '❌ GEE Service: Offline - Vui lòng chạy: python api_server.py';
+                    geeOnline = false;
+                    document.getElementById('btnFetch').disabled = true;
+                }
+            } catch (err) {
+                const statusEl = document.getElementById('geeStatus');
+                statusEl.className = 'gee-status offline';
+                statusEl.innerHTML = '❌ GEE Service: Không kết nối được - Chạy: python api_server.py';
+                geeOnline = false;
+                document.getElementById('btnFetch').disabled = true;
+            }
+        }
+
+        // Mở modal
+        function openFetchModal() {
+            if (!geeOnline) {
+                alert('GEE Service chưa sẵn sàng. Vui lòng chạy: python api_server.py');
+                return;
+            }
+            
+            const locationEl = document.getElementById('location');
+            const locationName = locationEl.options[locationEl.selectedIndex].text;
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+            
+            document.getElementById('modalLocation').textContent = locationName;
+            document.getElementById('modalPeriod').textContent = `${start} đến ${end}`;
+            document.getElementById('fetchModal').classList.add('show');
+        }
+
+        function closeFetchModal() {
+            document.getElementById('fetchModal').classList.remove('show');
+            document.getElementById('fetchProgress').style.display = 'none';
+            document.getElementById('progressFill').style.width = '0%';
+            document.getElementById('fetchLog').innerHTML = '';
+        }
+
+        // Tải dữ liệu từ GEE
+        async function fetchFromGEE() {
+            const locationEl = document.getElementById('location');
+            const location_id = locationEl.value;
+            const province = locationEl.options[locationEl.selectedIndex].dataset.province;
+            const start_date = document.getElementById('startDate').value;
+            const end_date = document.getElementById('endDate').value;
+
+            // Show progress
+            document.getElementById('fetchProgress').style.display = 'block';
+            document.getElementById('btnStartFetch').disabled = true;
+            
+            const logEl = document.getElementById('fetchLog');
+            const progressFill = document.getElementById('progressFill');
+            
+            logEl.innerHTML = '<div class="log-item">⏳ Đang kết nối với GEE...</div>';
+            progressFill.style.width = '10%';
+            progressFill.textContent = '10%';
+
+            try {
+                logEl.innerHTML += '<div class="log-item">🌍 Đang truy vấn dữ liệu ERA5...</div>';
+                progressFill.style.width = '30%';
+                progressFill.textContent = '30%';
+
+                const response = await fetch(`${API}/gee/fetch`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        province,
+                        location_id: parseInt(location_id),
+                        start_date,
+                        end_date,
+                        data_types: ['temperature']
+                    })
+                });
+
+                progressFill.style.width = '60%';
+                progressFill.textContent = '60%';
+                logEl.innerHTML += '<div class="log-item">💾 Đang lưu vào database...</div>';
+
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    progressFill.style.width = '100%';
+                    progressFill.textContent = '100%';
+                    
+                    const records = result.results.temperature?.records || 0;
+                    logEl.innerHTML = `
+                        <div class="log-item">✅ Hoàn thành!</div>
+                        <div class="log-item">📊 Đã tải: ${records} bản ghi nhiệt độ</div>
+                        <div class="log-item">📍 Khu vực: ${result.province}</div>
+                        <div class="log-item">📅 Thời gian: ${result.period}</div>
+                    `;
+
+                    setTimeout(() => {
+                        closeFetchModal();
+                        loadData();
+                    }, 2000);
+                } else {
+                    throw new Error(result.error || result.message || 'Unknown error');
+                }
+
+            } catch (err) {
+                progressFill.style.width = '0%';
+                progressFill.textContent = '0%';
+                logEl.innerHTML = `<div class="log-item" style="color: #f44336;">❌ Lỗi: ${err.message}</div>`;
+                
+                if (err.message.includes('ECONNREFUSED')) {
+                    logEl.innerHTML += '<div class="log-item" style="color: #ffa726;">⚠️ Python API không chạy. Vui lòng chạy: python api_server.py</div>';
+                }
+            } finally {
+                document.getElementById('btnStartFetch').disabled = false;
+            }
+        }
+
+        async function loadData() {
+            const locId = document.getElementById('location').value;
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+            const year = start.split('-')[0];
+
+            try {
+                const [daily, monthly] = await Promise.all([
+                    fetch(`${API}/temperature?location_id=${locId}&start=${start}&end=${end}`).then(r=>r.json()),
+                    fetch(`${API}/temperature/monthly?location_id=${locId}&year=${year}`).then(r=>r.json())
+                ]);
+
+                updateStats(daily.statistics);
+                updateAlert(daily.statistics);
+                drawDailyChart(daily.data);                
+                drawMonthlyChart(monthly.monthly_data);
+                drawRangeChart(monthly.monthly_data);
+
+            } catch (err) {
+                console.error('Error:', err);
+                alert('Lỗi khi tải dữ liệu. Có thể chưa có dữ liệu cho khoảng thời gian này.');
+            }
+        }
+        function classifyTemperature(value) {
+    const v = parseFloat(value);
+    if (isNaN(v)) return { level: 'unknown', label: 'Không có dữ liệu', color: '#999', css: '' };
+    if (v < 20) return { level: 'cool', label: 'Mát / Lạnh', color: '#4ecdc4', css: 'level-cool' };
+    if (v < 30) return { level: 'normal', label: 'Bình thường', color: '#95e1d3', css: 'level-normal' };
+    if (v < 35) return { level: 'warm', label: 'Nóng', color: '#feca57', css: 'level-warm' };
+    if (v < 40) return { level: 'hot', label: 'Nóng cao', color: '#ff6b6b', css: 'level-hot' };
+    return { level: 'extreme', label: 'Nóng cực đoan', color: '#d73027', css: 'level-extreme' };
+}
+
+        function updateAlert(stats) {
+            const avgTemp = parseFloat(stats.average);
+            const cls = classifyTemperature(avgTemp);
+
+            document.getElementById('alertBanner').style.display = 'block';
+            const levelEl = document.getElementById('tempLevel');
+            levelEl.textContent = cls.label.toUpperCase();
+            levelEl.className = 'temp-level ' + cls.css;
+
+            let desc = '';
+            if (cls.level === 'cool') {
+                desc = `
+                    <strong>📌 Thực tế:</strong><br>
+                    • Thường xuất hiện khi có mưa, mây dày hoặc rừng xanh lớn<br>
+                    • Đất ẩm, bốc hơi thấp, cây sinh trưởng mạnh<br><br>
+                    
+                    <strong>🌱 Tác động:</strong><br>
+                    • Không gây stress cho cây trồng<br>
+                    • Tốt cho rừng và vùng trồng cây công nghiệp<br><br>
+                    
+                    <strong>🟦 Đánh giá:</strong> Nhiệt độ bề mặt thấp, điều kiện mát mẻ. 
+                    Cây trồng và thảm thực vật sinh trưởng ổn định.
+                `;
+            } else if (cls.level === 'normal') {
+                desc = `
+                    <strong>📌 Thực tế:</strong><br>
+                    • Nhiệt độ trung bình của nhiều vùng tại Việt Nam<br>
+                    • Đất duy trì ẩm độ hợp lý nếu có mưa từng đợt<br><br>
+                    
+                    <strong>🌱 Tác động:</strong><br>
+                    • Cây phát triển tốt, đặc biệt là lúa và hoa màu<br><br>
+                    
+                    <strong>🟩 Đánh giá:</strong> Nhiệt độ bề mặt ở mức bình thường. 
+                    Điều kiện lý tưởng cho sản xuất nông nghiệp và hệ sinh thái.
+                `;
+            } else if (cls.level === 'warm') {
+                desc = `
+                    <strong>📌 Thực tế:</strong><br>
+                    • Xuất hiện nhiều tại đô thị và vùng đất trống<br>
+                    • Bề mặt vật liệu (bê tông, nhựa đường) tích nhiệt mạnh<br>
+                    • Đất bốc hơi nhanh, giảm độ ẩm<br><br>
+                    
+                    <strong>🌱 Tác động:</strong><br>
+                    • Cây trồng bắt đầu stress nước<br>
+                    • Rừng và cỏ khô dễ bén lửa<br><br>
+                    
+                    <strong>🟧 Cảnh báo:</strong> Nhiệt độ cao. Đất mất ẩm nhanh, cây trồng dễ bị stress nước. 
+                    Nguy cơ cháy rừng tăng.
+                `;
+            } else if (cls.level === 'hot') {
+                desc = `
+                    <strong>📌 Thực tế:</strong><br>
+                    • Nhiệt độ cao, đất và cây bị stress nhiệt rõ rệt<br>
+                    • Bốc hơi rất mạnh, cần tưới thường xuyên<br>
+                    • Hiệu ứng đảo nhiệt đô thị nghiêm trọng<br><br>
+                    
+                    <strong>🌱 Tác động:</strong><br>
+                    • Cây trồng sinh trưởng chậm, có thể bị cháy lá<br>
+                    • Nguy cơ cháy rừng cao<br>
+                    • Ảnh hưởng sức khỏe người và động vật<br><br>
+                    
+                    <strong>⚠️ Cảnh báo:</strong> Nhiệt độ rất cao! Cần áp dụng biện pháp tưới tiêu và che phủ đất. 
+                    Cảnh báo cháy rừng mức cao.
+                `;
+            } else if (cls.level === 'extreme') {
+                desc = `
+                    <strong>📌 Thực tế:</strong><br>
+                    • Nhiều tỉnh miền Trung ghi nhận 50-60°C ở bề mặt trong mùa nắng nóng<br>
+                    • Nguy hiểm cho cả người và động vật<br>
+                    • Dấu hiệu rõ của hiệu ứng đảo nhiệt đô thị<br><br>
+                    
+                    <strong>🌱 Tác động nghiêm trọng:</strong><br>
+                    • Cây chết hàng loạt nếu thiếu nước<br>
+                    • Đất bị nứt, thoái hóa, mất hữu cơ<br>
+                    • Cháy rừng ở mức báo động cao nhất<br>
+                    • Ảnh hưởng nghiêm trọng sức khỏe cộng đồng<br><br>
+                    
+                    <strong>🆘 CẢNH BÁO KHẨN CẤP:</strong> Nhiệt độ bề mặt cực kỳ cao! 
+                    Nguy cơ hạn hán, cháy rừng và ảnh hưởng sức khỏe con người. 
+                    Cần áp dụng biện pháp giảm nhiệt và bảo vệ nguồn nước ngay lập tức.
+                `;
+            }
+
+            document.getElementById('tempDesc').innerHTML = desc;
+        }
+        function updateStats(stats) {
+            document.getElementById('avgTemp').textContent = stats.average + '°';
+            document.getElementById('minTemp').textContent = stats.min + '°';
+            document.getElementById('maxTemp').textContent = stats.max + '°';
+            const range = (parseFloat(stats.max) - parseFloat(stats.min)).toFixed(1);
+            document.getElementById('tempRange').textContent = range + '°';
+        }
+
+        function drawDailyChart(data) {
+            const ctx = document.getElementById('dailyChart');
+            if (charts.daily) charts.daily.destroy();
+
+            charts.daily = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.map(d => d.date),
+                    datasets: [
+                        {
+                            label: 'Nhiệt độ TB',
+                            data: data.map(d => d.temp_mean),
+                            borderColor: '#ff6b6b',
+                            backgroundColor: 'rgba(255,107,107,0.1)',
+                            fill: true,
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Nhiệt độ Max',
+                            data: data.map(d => d.temp_max),
+                            borderColor: '#ff4444',
+                            backgroundColor: 'transparent',
+                            borderDash: [5, 5],
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Nhiệt độ Min',
+                            data: data.map(d => d.temp_min),
+                            borderColor: '#4ecdc4',
+                            backgroundColor: 'transparent',
+                            borderDash: [5, 5],
+                            tension: 0.4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { labels: { color: '#fff' } }
+                    },
+                    scales: {
+                        x: { 
+                            ticks: { color: '#999', maxTicksLimit: 15 },
+                            grid: { color: 'rgba(255,255,255,0.1)' }
+                        },
+                        y: { 
+                            ticks: { color: '#999' },
+                            grid: { color: 'rgba(255,255,255,0.1)' },
+                            title: { display: true, text: '°C', color: '#999' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function drawMonthlyChart(data) {
+            const ctx = document.getElementById('monthlyChart');
+            if (charts.monthly) charts.monthly.destroy();
+
+            const monthNames = ['T1','T2','T3','T4','T5','T6','T7','T8','T9','T10','T11','T12'];
+
+            charts.monthly = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: data.map(d => monthNames[d.month - 1]),
+                    datasets: [{
+                        label: 'Nhiệt độ TB (°C)',
+                        data: data.map(d => d.avg_temp),
+                        backgroundColor: data.map(d => {
+                            const temp = parseFloat(d.avg_temp);
+                            if (temp < 18) return '#4ecdc4';
+                            if (temp < 25) return '#95e1d3';
+                            if (temp < 30) return '#feca57';
+                            return '#ff6b6b';
+                        })
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { labels: { color: '#fff' } } },
+                    scales: {
+                        x: { ticks: { color: '#999' }, grid: { display: false } },
+                        y: { 
+                            ticks: { color: '#999' },
+                            grid: { color: 'rgba(255,255,255,0.1)' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function drawRangeChart(data) {
+            const ctx = document.getElementById('rangeChart');
+            if (charts.range) charts.range.destroy();
+
+            const monthNames = ['T1','T2','T3','T4','T5','T6','T7','T8','T9','T10','T11','T12'];
+
+            charts.range = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: data.map(d => monthNames[d.month - 1]),
+                    datasets: [{
+                        label: 'Biên độ nhiệt (°C)',
+                        data: data.map(d => (parseFloat(d.max_temp) - parseFloat(d.min_temp)).toFixed(1)),
+                        backgroundColor: '#a78bfa',
+                        borderColor: '#8b5cf6',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { labels: { color: '#fff' } } },
+                    scales: {
+                        x: { ticks: { color: '#999' }, grid: { display: false } },
+                        y: { 
+                            ticks: { color: '#999' },
+                            grid: { color: 'rgba(255,255,255,0.1)' },
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        async function loadLocations() {
+            try {
+                const res = await fetch(`${API}/locations`);
+                const data = await res.json();
+                const sel = document.getElementById('location');
+                sel.innerHTML = data.map(l => 
+                    `<option value="${l.id}" data-province="${l.province}">${l.name}</option>`
+                ).join('');
+            } catch (e) { 
+                console.log('Using default location'); 
+            }
+        }
+
+        // Init
+        window.onload = async () => {
+            const isValid = await AuthHelper.verifyToken();
+            if (!isValid) {
+                window.location.href = 'login.html';
+                return;
+            }
+            loadLocations();
+            checkGEEStatus();
+            setInterval(checkGEEStatus, 30000);
+            
+            // Log activity
+            await AuthHelper.logActivity('page_view', 'temperature');
+        };
+    </script>
+     <script src="js/auth.js"></script>
+</body>
+</html>

@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trang chủ - Phương</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            color: #fff;
+        }
+        
+        /* Navigation */
+        nav {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            padding: 15px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .nav-container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        #userInfo {
+            margin-left: auto;
+        }
+
+        #userInfo button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 0.9em;
+        }
+
+        #userInfo button:hover {
+            background: rgba(255,107,107,0.3);
+            transform: translateY(-2px);
+        }
+        .logo {
+            font-size: 1.5em;
+            font-weight: bold;
+            background: linear-gradient(90deg, #00d9ff, #00ff88);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .nav-links {
+            display: flex;
+            gap: 20px;
+            list-style: none;
+        }
+        .nav-links a {
+            color: rgba(255,255,255,0.8);
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            transition: all 0.3s;
+        }
+        .nav-links a:hover, .nav-links a.active {
+            background: rgba(255,255,255,0.1);
+            color: #00d9ff;
+        }
+
+        .container { max-width: 1600px; margin: 0 auto; padding: 30px 20px; }
+        
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        h1 { 
+            font-size: 2.5em; 
+            margin-bottom: 10px;
+            background: linear-gradient(90deg, #00d9ff, #00ff88);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .subtitle { color: rgba(255,255,255,0.7); font-size: 1.1em; }
+
+        /* Cards Grid */
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+            margin-top: 40px;
+        }
+        
+        .feature-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 20px;
+            padding: 30px;
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: all 0.3s;
+            cursor: pointer;
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0,217,255,0.3);
+            border-color: rgba(0,217,255,0.5);
+        }
+        
+        .card-icon {
+            font-size: 3.5em;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .card-title {
+            font-size: 1.5em;
+            font-weight: bold;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        .card-description {
+            color: rgba(255,255,255,0.7);
+            text-align: center;
+            line-height: 1.6;
+        }
+        
+        /* Color themes for each card */
+        .rainfall-card { border-left: 4px solid #00d9ff; }
+        .rainfall-card:hover { box-shadow: 0 10px 30px rgba(0,217,255,0.4); }
+        
+        .temperature-card { border-left: 4px solid #ff6b6b; }
+        .temperature-card:hover { box-shadow: 0 10px 30px rgba(255,107,107,0.4); }
+        
+        .soil-card { border-left: 4px solid #ffd93d; }
+        .soil-card:hover { box-shadow: 0 10px 30px rgba(255,217,61,0.4); }
+        
+        .ndvi-card { border-left: 4px solid #6bcb77; }
+        .ndvi-card:hover { box-shadow: 0 10px 30px rgba(107,203,119,0.4); }
+        
+        .tvdi-card { border-left: 4px solid #ff8c42; }
+        .tvdi-card:hover { box-shadow: 0 10px 30px rgba(255,140,66,0.4); }
+        
+        .overview-card { border-left: 4px solid #a78bfa; }
+        .overview-card:hover { box-shadow: 0 10px 30px rgba(167,139,250,0.4); }
+
+        @media (max-width: 768px) {
+            .nav-links { flex-direction: column; gap: 10px; }
+            h1 { font-size: 2em; }
+            .cards-grid { grid-template-columns: 1fr; }
+        }
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%),
+            url('https://img.freepik.com/free-photo/anime-moon-landscape_23-2151645871.jpg?semt=ais_hybrid&w=740&q=80');
+            background-size: cover;
+            background-position: center;
+            background-blend-mode: overlay;
+            min-height: 100vh;
+            color: #fff;
+            }
+    </style>
+</head>
+<body>
+    <nav>
+        <div class="nav-container">
+            <div class="logo" style="margin-right: 30px;">Trang chủ </div>
+            <ul class="nav-links">
+                <li><a href="index.html" class="active">Trang chủ</a></li>
+                <li><a href="rainfall.html">Lượng mưa</a></li>
+                <li><a href="temperature.html">Nhiệt độ</a></li>
+                <li><a href="ndvi.html">NDVI</a></li>
+                <li><a href="tvdi.html">TVDI</a></li>
+            </ul>
+            <div id="userInfo"></div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <header>
+            <h1 style="font-size: 130px; color: rgb(19, 19, 19);">Hệ thống Phân tích và đánh giá Sự Thay Đổi Thời Tiết</h1>
+
+        </header>
+        
+        
+    </div>
+    <script src="js/auth.js"></script>
+</body>
+</html>
