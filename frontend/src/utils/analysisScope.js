@@ -1,4 +1,4 @@
-const STORAGE_KEY = "gis:selected-analysis-scope";
+﻿const STORAGE_KEY = "gis:selected-analysis-scope";
 
 function canUseStorage() {
   return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
@@ -68,5 +68,9 @@ export function buildGeometryAnalysisScope(scope) {
     locationId: scope.locationId || scope.location_id || null,
     centroid_lat: scope.centroid_lat ?? null,
     centroid_lng: scope.centroid_lng ?? null,
+    point: scope.point ?? null,
+    radiusKm: scope.radiusKm ?? scope.radius_km ?? null,
+    address: scope.address ?? null,
+    metadata: scope.metadata ?? {},
   };
 }

@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import os
 from pathlib import Path
@@ -87,6 +87,10 @@ JWT_SECRET = os.getenv("JWT_SECRET", "")
 JWT_EXPIRES_DAYS = int(os.getenv("JWT_EXPIRES_DAYS", "7"))
 
 PYTHON_GEE_API_URL = os.getenv("PYTHON_GEE_API_URL", "http://127.0.0.1:3001")
+GEOCODER_SEARCH_URL = os.getenv("GEOCODER_SEARCH_URL", "https://nominatim.openstreetmap.org/search")
+GEOCODER_REVERSE_URL = os.getenv("GEOCODER_REVERSE_URL", "https://nominatim.openstreetmap.org/reverse")
+ROUTING_API_URL = os.getenv("ROUTING_API_URL", "https://router.project-osrm.org/route/v1")
+MAP_PROXY_USER_AGENT = os.getenv("MAP_PROXY_USER_AGENT", "web-gis-climate/1.0")
 
 if not JWT_SECRET:
     raise RuntimeError("JWT_SECRET is required. Set it in backend/.env")

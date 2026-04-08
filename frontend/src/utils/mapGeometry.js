@@ -1,17 +1,21 @@
-const DEFAULT_CENTER = [16.75, 107.18];
+﻿const DEFAULT_CENTER = [16.75, 107.18];
 
 const PROVINCE_CENTERS = {
   "quang tri": [16.75, 107.18],
   "thua thien-hue": [16.46, 107.59],
   "thua thien hue": [16.46, 107.59],
   "da nang": [16.05, 108.2],
+  "da nang city": [16.05, 108.2],
   "quang nam": [15.57, 108.02],
   "quang ngai": [15.12, 108.8],
   "binh dinh": [13.78, 109.22],
   "ha noi": [21.03, 105.85],
+  "ha noi city": [21.03, 105.85],
   "thanh pho ho chi minh": [10.78, 106.7],
   "ho chi minh city": [10.78, 106.7],
   "ho chi minh": [10.78, 106.7],
+  "can tho city": [10.03, 105.78],
+  "hai phong city": [20.84, 106.69],
   vietnam: [16.2, 106.3],
 };
 

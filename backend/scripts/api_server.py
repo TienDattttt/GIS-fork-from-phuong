@@ -1,5 +1,5 @@
-"""
-api_server.py - Flask API Server để nhận request từ UI và tải dữ liệu GEE
+﻿"""
+api_server.py - Flask API Server Ä‘á»ƒ nháº­n request tá»« UI vÃ  táº£i dá»¯ liá»‡u GEE
 """
 
 from flask import Flask, request, jsonify
@@ -34,7 +34,7 @@ DB_CONFIG = {
 # Initialize GEE
 def _initialize_gee_legacy():
     try:
-        # Ép buộc dùng đúng project
+        # Ã‰p buá»™c dÃ¹ng Ä‘Ãºng project
         gee_project = os.getenv('GEE_PROJECT', 'healthy-sign-476116-g0')
         ee.Initialize(project=gee_project)
         print(f"GEE initialized with project {gee_project}")
@@ -82,33 +82,33 @@ def initialize_gee(force=False):
         return False
 
 PROVINCE_MAPPING = {
-    'Quảng Trị': 'Quang Tri',
+    'Quáº£ng Trá»‹': 'Quang Tri',
     'Quang Tri': 'Quang Tri',
-    'Thừa Thiên Huế': 'Thua Thien-Hue',
-    'Đà Nẵng': 'Da Nang',
-    'Quảng Nam': 'Quang Nam',
-    'Quảng Ngãi': 'Quang Ngai',
-    'Bình Định': 'Binh Dinh',
-    'Hà Nội': 'Ha Noi',
-    'Hồ Chí Minh': 'Ho Chi Minh city',
-    # Thêm các tỉnh khác nếu cần
+    'Thá»«a ThiÃªn Huáº¿': 'Thua Thien-Hue',
+    'ÄÃ  Náºµng': 'Da Nang',
+    'Quáº£ng Nam': 'Quang Nam',
+    'Quáº£ng NgÃ£i': 'Quang Ngai',
+    'BÃ¬nh Äá»‹nh': 'Binh Dinh',
+    'HÃ  Ná»™i': 'Ha Noi',
+    'Há»“ ChÃ­ Minh': 'Ho Chi Minh city',
+    # ThÃªm cÃ¡c tá»‰nh khÃ¡c náº¿u cáº§n
 }
 
 PROVINCE_MAPPING = {
-    "Quảng Trị": "Quang Tri",
+    "Quáº£ng Trá»‹": "Quang Tri",
     "Quang Tri": "Quang Tri",
-    "Thừa Thiên Huế": "Thua Thien - Hue",
-    "Đà Nẵng": "Da Nang City",
+    "Thá»«a ThiÃªn Huáº¿": "Thua Thien - Hue",
+    "ÄÃ  Náºµng": "Da Nang City",
     "Da Nang": "Da Nang City",
-    "Quảng Nam": "Quang Nam",
-    "Quảng Ngãi": "Quang Ngai",
-    "Bình Định": "Binh Dinh",
-    "Hà Nội": "Ha Noi City",
-    "Hồ Chí Minh": "Ho Chi Minh City",
-    "TP. Hồ Chí Minh": "Ho Chi Minh City",
-    "Thành phố Hồ Chí Minh": "Ho Chi Minh City",
-    "Cần Thơ": "Can Tho city",
-    "Hải Phòng": "Hai Phong City",
+    "Quáº£ng Nam": "Quang Nam",
+    "Quáº£ng NgÃ£i": "Quang Ngai",
+    "BÃ¬nh Äá»‹nh": "Binh Dinh",
+    "HÃ  Ná»™i": "Ha Noi City",
+    "Há»“ ChÃ­ Minh": "Ho Chi Minh City",
+    "TP. Há»“ ChÃ­ Minh": "Ho Chi Minh City",
+    "ThÃ nh phá»‘ Há»“ ChÃ­ Minh": "Ho Chi Minh City",
+    "Cáº§n ThÆ¡": "Can Tho city",
+    "Háº£i PhÃ²ng": "Hai Phong City",
 }
 
 
@@ -189,33 +189,33 @@ def geometry_payload_to_ee_geometry(geometry_payload):
 # Get region geometry
 def get_region_geometry(province_name):
     try:
-        # Chuyển đổi tên tỉnh sang tên trong GAUL
+        # Chuyá»ƒn Ä‘á»•i tÃªn tá»‰nh sang tÃªn trong GAUL
         gaul_name = PROVINCE_MAPPING.get(province_name, province_name)
-        print(f"🔍 Searching for province: {province_name} -> {gaul_name}")
+        print(f"ðŸ” Searching for province: {province_name} -> {gaul_name}")
         
         gadm = ee.FeatureCollection("FAO/GAUL/2015/level1")
         
         # Filter Vietnam first
         vietnam = gadm.filter(ee.Filter.eq('ADM0_NAME', 'Viet Nam'))
         
-        # Tìm tỉnh
+        # TÃ¬m tá»‰nh
         region = vietnam.filter(ee.Filter.eq('ADM1_NAME', gaul_name))
         count = region.size().getInfo()
         
         if count == 0:
-            # Thử tìm với tên gốc
+            # Thá»­ tÃ¬m vá»›i tÃªn gá»‘c
             region = vietnam.filter(ee.Filter.eq('ADM1_NAME', province_name))
             count = region.size().getInfo()
         
         if count == 0:
-            # In ra danh sách tỉnh để debug
+            # In ra danh sÃ¡ch tá»‰nh Ä‘á»ƒ debug
             all_names = vietnam.aggregate_array('ADM1_NAME').getInfo()
-            print(f"❌ Province not found. Available provinces in Vietnam:")
+            print(f"âŒ Province not found. Available provinces in Vietnam:")
             for name in sorted(all_names):
                 print(f"   - {name}")
             return None
             
-        print(f"✅ Found province: {gaul_name}")
+        print(f"âœ… Found province: {gaul_name}")
         return region.geometry()
     except Exception as e:
         print(f"Error: {e}")
@@ -304,7 +304,7 @@ def get_rainfall_data(geometry, start_date, end_date, location_id):
 # TEMPERATURE
 def get_temperature_data(geometry, start_date, end_date, location_id):
     try:
-        # Thử ERA5_LAND trước (có dữ liệu mới hơn)
+        # Thá»­ ERA5_LAND trÆ°á»›c (cÃ³ dá»¯ liá»‡u má»›i hÆ¡n)
         collection = (
             ee.ImageCollection("ECMWF/ERA5_LAND/DAILY_AGGR")
             .filterBounds(geometry)
@@ -313,10 +313,10 @@ def get_temperature_data(geometry, start_date, end_date, location_id):
         )
         
         size = collection.size().getInfo()
-        print(f"📊 Temperature collection size: {size}")
+        print(f"ðŸ“Š Temperature collection size: {size}")
         
         if size == 0:
-            print("❌ No temperature data found for this period")
+            print("âŒ No temperature data found for this period")
             return pd.DataFrame()
         
         def extract(img):
@@ -455,11 +455,11 @@ def get_ndvi_data(geometry, start_date, end_date, location_id):
         return pd.DataFrame()
 
 # TVDI
-# TVDI CHUẨN (Sandholt, 2002)
-# TVDI - Phiên bản đơn giản hóa và sửa lỗi
+# TVDI CHUáº¨N (Sandholt, 2002)
+# TVDI - PhiÃªn báº£n Ä‘Æ¡n giáº£n hÃ³a vÃ  sá»­a lá»—i
 def get_tvdi_data(geometry, start_date, end_date, location_id):
     try:
-        # Lấy LST từ MOD11A2
+        # Láº¥y LST tá»« MOD11A2
         lst_col = (
             ee.ImageCollection("MODIS/061/MOD11A2")
             .filterBounds(geometry)
@@ -467,7 +467,7 @@ def get_tvdi_data(geometry, start_date, end_date, location_id):
             .select(['LST_Day_1km'])
         )
         
-        # Lấy NDVI từ MOD13Q1
+        # Láº¥y NDVI tá»« MOD13Q1
         ndvi_col = (
             ee.ImageCollection("MODIS/061/MOD13Q1")
             .filterBounds(geometry)
@@ -476,10 +476,10 @@ def get_tvdi_data(geometry, start_date, end_date, location_id):
         )
         
         lst_size = lst_col.size().getInfo()
-        print(f"📊 LST collection size: {lst_size}")
+        print(f"ðŸ“Š LST collection size: {lst_size}")
         
         if lst_size == 0:
-            print("❌ No LST data found")
+            print("âŒ No LST data found")
             return pd.DataFrame()
         
         data = []
@@ -491,10 +491,10 @@ def get_tvdi_data(geometry, start_date, end_date, location_id):
                 date = ee.Date(lst_img.get('system:time_start')).format('YYYY-MM-dd').getInfo()
                 print(f"  Processing: {date}")
                 
-                # Chuyển đổi LST sang độ C
+                # Chuyá»ƒn Ä‘á»•i LST sang Ä‘á»™ C
                 lst = lst_img.select('LST_Day_1km').multiply(0.02).subtract(273.15)
                 
-                # Tính thống kê LST
+                # TÃ­nh thá»‘ng kÃª LST
                 lst_stats = lst.reduceRegion(
                     reducer=ee.Reducer.mean()
                         .combine(ee.Reducer.min(), '', True)
@@ -513,18 +513,18 @@ def get_tvdi_data(geometry, start_date, end_date, location_id):
                 lst_max_val = lst_max.getInfo() if lst_max else None
                 
                 if lst_min_val is None or lst_max_val is None:
-                    print(f"    ⚠️ Skip {date}: No LST data")
+                    print(f"    âš ï¸ Skip {date}: No LST data")
                     continue
                 
-                # Tính TVDI đơn giản: (LST - LST_min) / (LST_max - LST_min)
+                # TÃ­nh TVDI Ä‘Æ¡n giáº£n: (LST - LST_min) / (LST_max - LST_min)
                 lst_range = lst_max_val - lst_min_val
                 if lst_range <= 0:
-                    print(f"    ⚠️ Skip {date}: LST range = 0")
+                    print(f"    âš ï¸ Skip {date}: LST range = 0")
                     continue
                 
                 tvdi_img = lst.subtract(lst_min_val).divide(lst_range)
                 
-                # Thống kê TVDI
+                # Thá»‘ng kÃª TVDI
                 tvdi_stats = tvdi_img.reduceRegion(
                     reducer=ee.Reducer.mean()
                         .combine(ee.Reducer.min(), '', True)
@@ -542,7 +542,7 @@ def get_tvdi_data(geometry, start_date, end_date, location_id):
                 tvdi_min_val = tvdi_min.getInfo() if tvdi_min else None
                 tvdi_max_val = tvdi_max.getInfo() if tvdi_max else None
                 
-                # Tính diện tích hạn (TVDI > 0.6)
+                # TÃ­nh diá»‡n tÃ­ch háº¡n (TVDI > 0.6)
                 drought_mask = tvdi_img.gt(0.6)
                 drought_pct = drought_mask.reduceRegion(
                     reducer=ee.Reducer.mean(),
@@ -552,7 +552,7 @@ def get_tvdi_data(geometry, start_date, end_date, location_id):
                 ).get('LST_Day_1km')
                 drought_pct_val = drought_pct.getInfo() if drought_pct else 0
                 
-                # Phân loại hạn
+                # PhÃ¢n loáº¡i háº¡n
                 def classify_drought(tvdi):
                     if tvdi is None:
                         return 'unknown'
@@ -580,13 +580,13 @@ def get_tvdi_data(geometry, start_date, end_date, location_id):
                 }
                 
                 data.append(record)
-                print(f"    ✅ {date}: TVDI={tvdi_mean_val:.4f}, LST={lst_mean_val:.2f}°C")
+                print(f"    âœ… {date}: TVDI={tvdi_mean_val:.4f}, LST={lst_mean_val:.2f}Â°C")
                 
             except Exception as e:
-                print(f"    ❌ Error processing image {i}: {e}")
+                print(f"    âŒ Error processing image {i}: {e}")
                 continue
         
-        print(f"📊 Total records: {len(data)}")
+        print(f"ðŸ“Š Total records: {len(data)}")
         return pd.DataFrame(data)
         
     except Exception as e:
@@ -1237,6 +1237,277 @@ def fetch_data():
             'results': results
         })
     
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+def resolve_analysis_geometry(province=None, geometry_payload=None):
+    if geometry_payload:
+        return geometry_payload_to_ee_geometry(geometry_payload)
+    if province:
+        return get_region_geometry(province)
+    return None
+
+
+def build_layer_definition(data_type, geometry, start_date, end_date, metric=None):
+    end_ee = ee.Date(end_date).advance(1, 'day')
+
+    if data_type == 'rainfall':
+        image = (
+            ee.ImageCollection('UCSB-CHG/CHIRPS/DAILY')
+            .filterDate(start_date, end_ee)
+            .filterBounds(geometry)
+            .select('precipitation')
+            .sum()
+            .rename('value')
+            .clip(geometry)
+        )
+        return {
+            'image': image,
+            'band': 'value',
+            'scale': 5000,
+            'vis': {'min': 0, 'max': 300, 'palette': ['#f7fbff', '#c6dbef', '#6baed6', '#2171b5', '#08306b']},
+            'units': 'mm',
+            'label': 'Luong mua',
+        }
+
+    if data_type == 'temperature':
+        image = (
+            ee.ImageCollection('ECMWF/ERA5_LAND/DAILY_AGGR')
+            .filterDate(start_date, end_ee)
+            .filterBounds(geometry)
+            .select('temperature_2m')
+            .mean()
+            .subtract(273.15)
+            .rename('value')
+            .clip(geometry)
+        )
+        return {
+            'image': image,
+            'band': 'value',
+            'scale': 10000,
+            'vis': {'min': 10, 'max': 45, 'palette': ['#313695', '#74add1', '#ffffbf', '#f46d43', '#a50026']},
+            'units': 'do C',
+            'label': 'Nhiet do',
+        }
+
+    if data_type == 'soil_moisture':
+        metric_map = {
+            'surface': 'volumetric_soil_water_layer_1',
+            'rootzone': 'volumetric_soil_water_layer_2',
+            'profile': 'volumetric_soil_water_layer_3',
+        }
+        selected_metric = metric if metric in metric_map else 'surface'
+        band_name = metric_map[selected_metric]
+        image = (
+            ee.ImageCollection('ECMWF/ERA5_LAND/DAILY_AGGR')
+            .filterDate(start_date, end_ee)
+            .filterBounds(geometry)
+            .select(band_name)
+            .mean()
+            .rename('value')
+            .clip(geometry)
+        )
+        return {
+            'image': image,
+            'band': 'value',
+            'scale': 10000,
+            'vis': {'min': 0, 'max': 0.6, 'palette': ['#f7fcf0', '#ccebc5', '#7bccc4', '#2b8cbe', '#084081']},
+            'units': 'm3/m3',
+            'label': f'Do am dat ({selected_metric})',
+            'metric': selected_metric,
+        }
+
+    if data_type == 'ndvi':
+        image = (
+            ee.ImageCollection('MODIS/061/MOD13Q1')
+            .filterDate(start_date, end_ee)
+            .filterBounds(geometry)
+            .select('NDVI')
+            .mean()
+            .multiply(0.0001)
+            .rename('value')
+            .clip(geometry)
+        )
+        return {
+            'image': image,
+            'band': 'value',
+            'scale': 250,
+            'vis': {'min': 0, 'max': 1, 'palette': ['#8c510a', '#d8b365', '#f6e8c3', '#5ab45f', '#01665e']},
+            'units': 'NDVI',
+            'label': 'NDVI',
+        }
+
+    if data_type == 'tvdi':
+        lst = (
+            ee.ImageCollection('MODIS/061/MOD11A2')
+            .filterDate(start_date, end_ee)
+            .filterBounds(geometry)
+            .select('LST_Day_1km')
+            .mean()
+            .multiply(0.02)
+            .subtract(273.15)
+            .rename('lst')
+        )
+        ndvi = (
+            ee.ImageCollection('MODIS/061/MOD13Q1')
+            .filterDate(start_date, end_ee)
+            .filterBounds(geometry)
+            .select('NDVI')
+            .mean()
+            .multiply(0.0001)
+            .rename('ndvi')
+        )
+        combined = lst.addBands(ndvi)
+        valid_mask = ndvi.gte(0).And(ndvi.lte(1)).And(lst.gt(-50)).And(lst.lt(80))
+        combined = combined.updateMask(valid_mask)
+
+        tvdi_img = None
+        sample = combined.sample(region=geometry, scale=1000, numPixels=3000, geometries=False).getInfo()
+        features = sample.get('features', []) if isinstance(sample, dict) else []
+        edges = compute_tvdi_edges(features)
+        if edges:
+            wet_slope = edges['wet_edge']['slope']
+            wet_intercept = edges['wet_edge']['intercept']
+            dry_slope = edges['dry_edge']['slope']
+            dry_intercept = edges['dry_edge']['intercept']
+            ndvi_img = combined.select('ndvi')
+            lst_img = combined.select('lst')
+            wet_edge_img = ndvi_img.multiply(wet_slope).add(wet_intercept)
+            dry_edge_img = ndvi_img.multiply(dry_slope).add(dry_intercept)
+            denominator = dry_edge_img.subtract(wet_edge_img)
+            tvdi_img = lst_img.subtract(wet_edge_img).divide(denominator.where(denominator.abs().lt(0.001), 0.001)).clamp(0, 1)
+        else:
+            lst_stats = lst.reduceRegion(reducer=ee.Reducer.minMax(), geometry=geometry, scale=1000, bestEffort=True, maxPixels=1e13).getInfo()
+            lst_min = lst_stats.get('lst_min')
+            lst_max = lst_stats.get('lst_max')
+            if lst_min is not None and lst_max is not None and lst_max != lst_min:
+                tvdi_img = lst.subtract(lst_min).divide(lst_max - lst_min).clamp(0, 1)
+
+        if tvdi_img is None:
+            raise ValueError('Could not derive TVDI raster for the selected period.')
+
+        return {
+            'image': tvdi_img.rename('value').clip(geometry),
+            'band': 'value',
+            'scale': 1000,
+            'vis': {'min': 0, 'max': 1, 'palette': ['#2166ac', '#67a9cf', '#f7f7f7', '#ef8a62', '#b2182b']},
+            'units': 'TVDI',
+            'label': 'TVDI',
+        }
+
+    raise ValueError(f'Unsupported data type: {data_type}')
+
+
+def build_layer_payload(layer_definition, geometry, data_type, start_date, end_date):
+    image = layer_definition['image']
+    band = layer_definition['band']
+    vis = layer_definition['vis']
+    map_payload = image.getMapId(vis)
+    tile_fetcher = map_payload.get('tile_fetcher') if isinstance(map_payload, dict) else None
+    tile_url = getattr(tile_fetcher, 'url_format', None)
+    stats = image.reduceRegion(
+        reducer=ee.Reducer.minMax().combine(ee.Reducer.mean(), '', True),
+        geometry=geometry,
+        scale=layer_definition['scale'],
+        bestEffort=True,
+        maxPixels=1e13,
+    ).getInfo()
+    return {
+        'data_type': data_type,
+        'label': layer_definition.get('label'),
+        'units': layer_definition.get('units'),
+        'tile_url': tile_url,
+        'legend': {
+            'min': vis['min'],
+            'max': vis['max'],
+            'palette': vis['palette'],
+            'units': layer_definition.get('units'),
+        },
+        'statistics': {
+            'min': stats.get(f'{band}_min'),
+            'max': stats.get(f'{band}_max'),
+            'mean': stats.get(f'{band}_mean'),
+        },
+        'period': f'{start_date} to {end_date}',
+        'metric': layer_definition.get('metric'),
+    }
+
+
+@app.route('/map-layer', methods=['POST'])
+def map_layer():
+    try:
+        data = request.json or {}
+        data_type = data.get('data_type')
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+        province = data.get('province')
+        geometry_payload = data.get('geometry')
+        metric = data.get('metric')
+
+        if data_type not in {'rainfall', 'temperature', 'soil_moisture', 'ndvi', 'tvdi'}:
+            return jsonify({'error': 'Invalid data_type'}), 400
+        if not start_date or not end_date:
+            return jsonify({'error': 'Missing required parameters'}), 400
+        if not initialize_gee():
+            return jsonify({'error': 'Failed to initialize Google Earth Engine', 'details': GEE_STATE.get('last_error')}), 500
+
+        geometry = resolve_analysis_geometry(province, geometry_payload)
+        if geometry is None:
+            return jsonify({'error': 'Failed to resolve analysis geometry'}), 400
+
+        layer_definition = build_layer_definition(data_type, geometry, start_date, end_date, metric)
+        return jsonify({'success': True, **build_layer_payload(layer_definition, geometry, data_type, start_date, end_date)})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/sample-point', methods=['POST'])
+def sample_point():
+    try:
+        data = request.json or {}
+        data_type = data.get('data_type')
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+        lat = data.get('lat')
+        lng = data.get('lng')
+        province = data.get('province')
+        geometry_payload = data.get('geometry')
+        metric = data.get('metric')
+
+        if data_type not in {'rainfall', 'temperature', 'soil_moisture', 'ndvi', 'tvdi'}:
+            return jsonify({'error': 'Invalid data_type'}), 400
+        if not start_date or not end_date or lat is None or lng is None:
+            return jsonify({'error': 'Missing required parameters'}), 400
+        if not initialize_gee():
+            return jsonify({'error': 'Failed to initialize Google Earth Engine', 'details': GEE_STATE.get('last_error')}), 500
+
+        geometry = resolve_analysis_geometry(province, geometry_payload)
+        if geometry is None:
+            return jsonify({'error': 'Failed to resolve analysis geometry'}), 400
+
+        point = ee.Geometry.Point([float(lng), float(lat)])
+        layer_definition = build_layer_definition(data_type, geometry, start_date, end_date, metric)
+        image = layer_definition['image']
+        band = layer_definition['band']
+        sampled = image.reduceRegion(
+            reducer=ee.Reducer.first(),
+            geometry=point,
+            scale=layer_definition['scale'],
+            bestEffort=True,
+            maxPixels=1e13,
+        ).getInfo()
+        value = sampled.get(band) if isinstance(sampled, dict) else None
+        return jsonify({
+            'success': True,
+            'data_type': data_type,
+            'lat': float(lat),
+            'lng': float(lng),
+            'value': value,
+            'units': layer_definition.get('units'),
+            'label': layer_definition.get('label'),
+            'metric': layer_definition.get('metric'),
+            'period': f'{start_date} to {end_date}',
+        })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

@@ -1,5 +1,20 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
-import { ArrowRight, LoaderCircle, PencilLine, Target, Upload, X } from "lucide-react";
+﻿
+import { useEffect, useMemo, useState } from "react";
+import {
+  ArrowRight,
+  Layers3,
+  LoaderCircle,
+  LocateFixed,
+  MapPin,
+  PencilLine,
+  Radar,
+  Route,
+  Save,
+  Search,
+  Target,
+  Upload,
+  X,
+} from "lucide-react";
 import {
   CircleMarker,
   GeoJSON,
@@ -22,12 +37,29 @@ import {
   readSelectedAnalysisScope,
   writeSelectedAnalysisScope,
 } from "../utils/analysisScope";
-import { getLocationCenter, getMapLabel, hasGeometry, normalizeGeoJson } from "../utils/mapGeometry";
+import { getLocationCenter, hasGeometry, normalizeGeoJson } from "../utils/mapGeometry";
 import { pickPreferredLocation, writeSelectedLocation } from "../utils/locationSelection";
+import { createCircleFeature, formatDistanceKm, formatDuration } from "../utils/spatial";
 import { toVietnameseLabel } from "../utils/viText";
 
 const DEFAULT_LOCATION = { id: 1, name: "Quảng Trị", province: "Quảng Trị", geometry: null, adminLevel: 1 };
 const DEFAULT_CENTER = [16.75, 107.18];
+
+const THEMATIC_OPTIONS = [
+  { value: "rainfall", label: "Bản đồ lượng mưa" },
+  { value: "temperature", label: "Bản đồ nhiệt độ" },
+  { value: "soil_moisture", label: "Bản đồ độ ẩm đất" },
+  { value: "ndvi", label: "Bản đồ NDVI" },
+  { value: "tvdi", label: "Bản đồ TVDI" },
+];
+
+const MODULE_LINKS = [
+  { path: "/rainfall", label: "Phân tích mưa" },
+  { path: "/temperature", label: "Phân tích nhiệt độ" },
+  { path: "/soil-moisture", label: "Phân tích độ ẩm đất" },
+  { path: "/ndvi", label: "Phân tích NDVI" },
+  { path: "/tvdi", label: "Phân tích TVDI" },
+];
 
 function boundaryToLocation(boundary, availableLocations = []) {
   const matchedLocation = availableLocations.find(
@@ -35,6 +67,7 @@ function boundaryToLocation(boundary, availableLocations = []) {
       String(item.name || "").toLowerCase() === String(boundary.name || "").toLowerCase() ||
       String(item.province || "").toLowerCase() === String(boundary.province_name || boundary.name || "").toLowerCase()
   );
+
   return {
     id: boundary.location_id || matchedLocation?.id || boundary.id,
     locationId: boundary.location_id || matchedLocation?.id || null,
@@ -57,26 +90,13 @@ function standardWardToLocation(ward, province) {
     boundaryCode: ward.code,
     adminLevel: 2,
     parentCode: ward.province_code || province?.boundaryCode || null,
-    name: ward.name,
+    name: ward.full_name || ward.name,
     province: province?.name || province?.province || "",
     geometry: null,
     centroid_lat: province?.centroid_lat ?? null,
     centroid_lng: province?.centroid_lng ?? null,
     source: "thanglequoc/vietnamese-provinces-database",
   };
-}
-
-function countGeometryItems(items) {
-  return items.filter((item) => hasGeometry(item)).length;
-}
-
-function resolveProvinceFromPreferred(pool, preferred) {
-  return (
-    pool.find((item) => String(item.boundaryCode || "") === String(preferred?.boundaryCode || "")) ||
-    pool.find((item) => String(item.name || "").toLowerCase() === String(preferred?.province || preferred?.name || "").toLowerCase()) ||
-    pool[0] ||
-    DEFAULT_LOCATION
-  );
 }
 
 function buildPolygonFeature(points, properties = {}) {
@@ -103,6 +123,15 @@ function historyRowToScope(row) {
   });
 }
 
+function resolveProvinceFromPreferred(pool, preferred) {
+  return (
+    pool.find((item) => String(item.boundaryCode || "") === String(preferred?.boundaryCode || "")) ||
+    pool.find((item) => String(item.name || "").toLowerCase() === String(preferred?.province || preferred?.name || "").toLowerCase()) ||
+    pool[0] ||
+    DEFAULT_LOCATION
+  );
+}
+
 function readGeoJsonFile(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -118,18 +147,36 @@ function readGeoJsonFile(file) {
   });
 }
 
+function routeGeometryToPolyline(geometry) {
+  if (!geometry?.coordinates || geometry.type !== "LineString") {
+    return [];
+  }
+  return geometry.coordinates.map(([lng, lat]) => [lat, lng]);
+}
+
+function getHotspotBadge(classification) {
+  if (classification === "extreme") return "tag warn";
+  if (classification === "severe") return "tag warn";
+  if (classification === "moderate") return "tag custom";
+  return "tag ok";
+}
+
 function MapFocusController({ center, zoom }) {
   const map = useMap();
   useEffect(() => {
-    map.flyTo(center, zoom, { animate: true, duration: 1.1 });
+    map.flyTo(center, zoom, { animate: true, duration: 1.05 });
   }, [center, map, zoom]);
   return null;
 }
 
-function MapDrawRecorder({ active, onPointAdd }) {
+function MapInteractionController({ drawMode, onDrawPoint, onPickPoint }) {
   useMapEvents({
     click(event) {
-      if (active) onPointAdd([event.latlng.lat, event.latlng.lng]);
+      if (drawMode) {
+        onDrawPoint([event.latlng.lat, event.latlng.lng]);
+        return;
+      }
+      onPickPoint({ lat: event.latlng.lat, lng: event.latlng.lng });
     },
   });
   return null;
@@ -138,29 +185,65 @@ function MapDrawRecorder({ active, onPointAdd }) {
 export default function MapPage() {
   const navigate = useNavigate();
   const { logActivity, token } = useAuth();
+
   const [provinces, setProvinces] = useState([]);
   const [wardMap, setWardMap] = useState({});
   const [selectedProvinceCode, setSelectedProvinceCode] = useState("");
   const [selectedWardCode, setSelectedWardCode] = useState("");
   const [selectedLocation, setSelectedLocation] = useState(DEFAULT_LOCATION);
-  const [customScope, setCustomScope] = useState(null);
+  const [customScope, setCustomScope] = useState(() => {
+    const stored = readSelectedAnalysisScope();
+    return stored?.mode === "geometry" && stored.geometry ? stored : null;
+  });
   const [customName, setCustomName] = useState("Vùng phân tích tùy chọn");
   const [drawMode, setDrawMode] = useState(false);
   const [drawPoints, setDrawPoints] = useState([]);
   const [recentAreas, setRecentAreas] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [isWardLoading, setIsWardLoading] = useState(false);
+
   const [status, setStatus] = useState("");
   const [statusType, setStatusType] = useState("ok");
-  const [isWardLoading, setIsWardLoading] = useState(false);
-  const [historyLoading, setHistoryLoading] = useState(false);
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+
+  const [selectedPoint, setSelectedPoint] = useState(null);
+  const [currentPosition, setCurrentPosition] = useState(null);
+  const [pointAddress, setPointAddress] = useState(null);
+  const [pointContext, setPointContext] = useState(null);
+  const [locating, setLocating] = useState(false);
+
+  const [radiusKm, setRadiusKm] = useState("10");
+  const [routeProfile, setRouteProfile] = useState("driving");
+  const [routeLoading, setRouteLoading] = useState(false);
+  const [routeInfo, setRouteInfo] = useState(null);
+
+  const [layerForm, setLayerForm] = useState({
+    dataType: "ndvi",
+    metric: "surface",
+    startDate: "2020-01-01",
+    endDate: "2020-12-31",
+  });
+  const [layerLoading, setLayerLoading] = useState(false);
+  const [activeLayer, setActiveLayer] = useState(null);
+  const [layerOpacity, setLayerOpacity] = useState(0.78);
+
+  const [sampleLoading, setSampleLoading] = useState(false);
+  const [pointSample, setPointSample] = useState(null);
+
+  const [hotspotsLoading, setHotspotsLoading] = useState(false);
+  const [hotspots, setHotspots] = useState([]);
+
+  const [mapView, setMapView] = useState({ center: DEFAULT_CENTER, zoom: 7 });
 
   useEffect(() => {
     void logActivity("page_view", "map");
-    const storedScope = readSelectedAnalysisScope();
-    if (storedScope?.mode === "geometry" && storedScope.geometry) {
-      setCustomScope(buildGeometryAnalysisScope(storedScope));
-      setCustomName(storedScope.name || "Vùng phân tích tùy chọn");
+    if (customScope?.name) {
+      setCustomName(customScope.name);
     }
-  }, [logActivity]);
+  }, [customScope, logActivity]);
 
   useEffect(() => {
     const loadHistory = async () => {
@@ -168,7 +251,7 @@ export default function MapPage() {
       setHistoryLoading(true);
       try {
         const response = await apiClient.get("/analysis-areas/history", {
-          params: { limit: 8 },
+          params: { limit: 10 },
           headers: authHeaders(token),
         });
         setRecentAreas(response.data?.data || []);
@@ -178,6 +261,7 @@ export default function MapPage() {
         setHistoryLoading(false);
       }
     };
+
     void loadHistory();
   }, [token]);
 
@@ -201,26 +285,34 @@ export default function MapPage() {
           : baseLocations.map((item) => ({ ...item, locationId: item.id, adminLevel: 1, boundaryCode: null, parentCode: null }));
         const preferred = pickPreferredLocation(nextProvinces, DEFAULT_LOCATION);
         const nextProvince = resolveProvinceFromPreferred(nextProvinces, preferred);
+
         setProvinces(nextProvinces);
         setSelectedProvinceCode(nextProvince?.boundaryCode || "");
         setSelectedLocation(nextProvince);
         writeSelectedLocation(nextProvince);
-        if (!customScope) writeSelectedAnalysisScope(buildLocationAnalysisScope(nextProvince));
+        setMapView({ center: getLocationCenter(nextProvince), zoom: hasGeometry(nextProvince) ? 8 : 7 });
+
+        if (!customScope) {
+          writeSelectedAnalysisScope(buildLocationAnalysisScope(nextProvince));
+        }
+
         setStatus(
           provinceBoundaries.length
-            ? `Đã nạp ${nextProvinces.length} tỉnh/thành lên bản đồ. Bạn có thể click ranh giới, vẽ polygon tay hoặc upload GeoJSON.`
-            : "Bản đồ đang dùng danh sách địa điểm hiện có, chưa lấy được đầy đủ admin_boundaries cấp tỉnh."
+            ? `Đã nạp ${nextProvinces.length} tỉnh/thành lên bản đồ. Bạn có thể tìm kiếm text, lấy vị trí hiện tại, vẽ polygon hoặc bật lớp bản đồ khí hậu.`
+            : "Bản đồ đang dùng danh sách địa điểm hiện có; chưa có đầy đủ hình học hành chính cho mọi khu vực."
         );
         setStatusType(provinceBoundaries.length ? "ok" : "warn");
       } catch {
         setProvinces([DEFAULT_LOCATION]);
         setSelectedLocation(DEFAULT_LOCATION);
+        setMapView({ center: DEFAULT_CENTER, zoom: 7 });
         setStatus("Không tải được dữ liệu bản đồ. Hệ thống đang dùng cấu hình mặc định của Quảng Trị.");
         setStatusType("error");
       }
     };
+
     void loadProvinces();
-  }, [customScope]);
+  }, []);
 
   const selectedProvince = useMemo(() => {
     if (!provinces.length) return DEFAULT_LOCATION;
@@ -256,108 +348,285 @@ export default function MapPage() {
         setIsWardLoading(false);
       }
     };
+
     setSelectedWardCode("");
     void loadWards();
   }, [selectedProvince, wardMap]);
 
   useEffect(() => {
-    if (!customScope) setSelectedLocation(selectedWard || selectedProvince || DEFAULT_LOCATION);
-  }, [customScope, selectedProvince, selectedWard]);
+    if (!searchQuery.trim() || searchQuery.trim().length < 2) {
+      setSearchResults([]);
+      return undefined;
+    }
 
-  const applyGeometryScope = (scope) => {
+    const timer = window.setTimeout(async () => {
+      setSearchLoading(true);
+      try {
+        const response = await apiClient.get("/map/geocode", { params: { q: searchQuery, limit: 6 } });
+        setSearchResults(response.data?.data || []);
+      } catch {
+        setSearchResults([]);
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 400);
+
+    return () => window.clearTimeout(timer);
+  }, [searchQuery]);
+
+  const selectedBoundaryFeature = useMemo(
+    () => normalizeGeoJson(selectedWard?.geometry || selectedProvince?.geometry),
+    [selectedProvince, selectedWard]
+  );
+  const customFeature = useMemo(() => normalizeGeoJson(customScope?.geometry), [customScope]);
+  const drawingPreview = useMemo(() => (drawPoints.length >= 3 ? buildPolygonFeature(drawPoints, { name: customName }) : null), [customName, drawPoints]);
+  const routeLine = useMemo(() => routeGeometryToPolyline(routeInfo?.geometry), [routeInfo]);
+
+  function focusMap(center, zoom = 11) {
+    setMapView({ center, zoom });
+  }
+
+  function buildSpatialScopePayload() {
+    if (customScope?.geometry) {
+      return { geometry: customScope.geometry, province: customScope.province || selectedProvince?.name };
+    }
+    if (selectedWard?.geometry) {
+      return { geometry: selectedWard.geometry, province: selectedProvince?.name || selectedProvince?.province };
+    }
+    if (selectedProvince?.geometry) {
+      return { geometry: selectedProvince.geometry, province: selectedProvince?.name || selectedProvince?.province };
+    }
+    return { province: selectedProvince?.province || selectedProvince?.name || DEFAULT_LOCATION.province };
+  }
+
+  function applyGeometryScope(scope) {
     const normalized = buildGeometryAnalysisScope(scope);
     if (!normalized) return;
     setCustomScope(normalized);
-    setSelectedLocation(normalized);
+    setCustomName(normalized.name);
     setDrawMode(false);
     setDrawPoints([]);
     writeSelectedAnalysisScope(normalized);
-  };
+    focusMap(getLocationCenter(normalized), 11);
+  }
 
-  const selectedCenter = getLocationCenter(customScope || selectedWard || selectedProvince || selectedLocation || DEFAULT_LOCATION);
-  const selectedZoom = customScope ? 11 : selectedWard ? 11 : hasGeometry(selectedProvince) ? 8 : 7;
-  const wardsWithGeometry = countGeometryItems(wards);
-  const drawingPreview = drawPoints.length >= 3 ? buildPolygonFeature(drawPoints) : null;
+  function resetCustomScope() {
+    setCustomScope(null);
+    setDrawMode(false);
+    setDrawPoints([]);
+    setRouteInfo(null);
+    const nextLocation = selectedWard || selectedProvince || DEFAULT_LOCATION;
+    writeSelectedAnalysisScope(buildLocationAnalysisScope(nextLocation));
+    focusMap(getLocationCenter(nextLocation), selectedWard ? 11 : 8);
+  }
 
-  const handleSelectProvince = async (province) => {
+  async function loadPointSample(lat, lng, dataType = activeLayer?.data_type || layerForm.dataType) {
+    setSampleLoading(true);
+    try {
+      const response = await apiClient.post("/map/point-sample", {
+        data_type: dataType,
+        metric: layerForm.metric,
+        lat,
+        lng,
+        start_date: layerForm.startDate,
+        end_date: layerForm.endDate,
+        ...buildSpatialScopePayload(),
+      });
+      setPointSample(response.data?.data || null);
+    } catch {
+      setPointSample(null);
+    } finally {
+      setSampleLoading(false);
+    }
+  }
+
+  async function resolvePointContext(lat, lng, options = {}) {
+    const nextPoint = {
+      lat,
+      lng,
+      label: options.label || "Điểm đã chọn",
+      source: options.source || "map_click",
+    };
+    setSelectedPoint(nextPoint);
+    focusMap([lat, lng], 12);
+
+    try {
+      const [reverseResponse, contextResponse] = await Promise.all([
+        apiClient.get("/map/reverse", { params: { lat, lng } }),
+        apiClient.get("/map/context", { params: { lat, lng } }),
+      ]);
+      setPointAddress(reverseResponse.data?.data || null);
+      setPointContext(contextResponse.data?.data || null);
+      if (reverseResponse.data?.data?.display_name) {
+        setSelectedPoint((current) => ({ ...current, label: reverseResponse.data.data.display_name }));
+      }
+    } catch {
+      setPointAddress(null);
+      setPointContext(null);
+    }
+
+    if (activeLayer) {
+      await loadPointSample(lat, lng, activeLayer.data_type);
+    }
+  }
+
+  async function handleSearchResultSelect(result) {
+    setSearchQuery(result.display_name || "");
+    setSearchResults([]);
+    await resolvePointContext(Number(result.lat), Number(result.lng), {
+      label: result.display_name,
+      source: "text_search",
+    });
+
+    if (result.geometry) {
+      applyGeometryScope({
+        name: result.display_name?.split(",")[0] || "Vùng tìm kiếm",
+        province: selectedProvince?.name || selectedProvince?.province || "Vùng tìm kiếm",
+        geometry: result.geometry,
+        sourceType: "text_search",
+        address: result.display_name,
+        point: { lat: Number(result.lat), lng: Number(result.lng) },
+      });
+      setStatus("Đã chọn kết quả tìm kiếm làm vùng phân tích và xác định đúng tọa độ trên bản đồ.");
+      setStatusType("ok");
+    } else {
+      setStatus("Đã xác định tọa độ từ tìm kiếm text. Bạn có thể tạo vùng bán kính quanh điểm này để phân tích.");
+      setStatusType("ok");
+    }
+  }
+
+  async function handleUseCurrentLocation() {
+    if (!navigator.geolocation) {
+      setStatus("Trình duyệt hiện tại không hỗ trợ lấy vị trí.");
+      setStatusType("error");
+      return;
+    }
+
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const lat = Number(position.coords.latitude);
+        const lng = Number(position.coords.longitude);
+        setCurrentPosition({ lat, lng });
+        await resolvePointContext(lat, lng, { label: "Vị trí hiện tại", source: "current_location" });
+        setStatus("Đã lấy vị trí hiện tại của bạn và hiển thị lên bản đồ.");
+        setStatusType("ok");
+        setLocating(false);
+      },
+      () => {
+        setStatus("Không lấy được vị trí hiện tại. Hãy kiểm tra quyền truy cập vị trí của trình duyệt.");
+        setStatusType("error");
+        setLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }
+
+  function handleSelectProvince(province) {
     setSelectedProvinceCode(province.boundaryCode || "");
     setSelectedWardCode("");
     setSelectedLocation(province);
-    setCustomScope(null);
     writeSelectedLocation(province);
-    writeSelectedAnalysisScope(buildLocationAnalysisScope(province));
-    try {
-      await logActivity("map_select_province", "map", { provinceCode: province.boundaryCode, province: province.province });
-    } catch {}
-  };
+    if (!customScope) {
+      writeSelectedAnalysisScope(buildLocationAnalysisScope(province));
+    }
+    focusMap(getLocationCenter(province), hasGeometry(province) ? 8 : 7);
+  }
 
-  const handleSelectWard = async (ward) => {
+  function handleSelectWard(ward) {
     setSelectedWardCode(ward.boundaryCode || "");
     setSelectedLocation(ward);
-    setCustomScope(null);
-    writeSelectedLocation(selectedProvince);
-    writeSelectedAnalysisScope(buildLocationAnalysisScope(selectedProvince));
-    try {
-      await logActivity("map_select_ward", "map", { wardCode: ward.boundaryCode, wardName: ward.name });
-    } catch {}
-  };
+    focusMap(getLocationCenter(ward), 11);
+  }
 
-  const useSelectedBoundaryAsScope = () => {
+  function useSelectedBoundaryAsScope() {
     const target = selectedWard || selectedProvince;
     if (!target?.geometry) {
       setStatus("Khu vực đang chọn chưa có geometry để dùng làm vùng phân tích.");
       setStatusType("warn");
       return;
     }
+
     applyGeometryScope({
       name: target.name,
       province: target.province || selectedProvince?.name,
       geometry: target.geometry,
       sourceType: "boundary_click",
       boundaryCode: target.boundaryCode,
+      locationId: target.locationId,
       centroid_lat: target.centroid_lat,
       centroid_lng: target.centroid_lng,
-      locationId: target.locationId,
     });
-    setCustomName(target.name);
-    setStatus(`Đã chọn vùng ${toVietnameseLabel(target.name)} để phân tích theo geometry.`);
+    setStatus(`Đã chọn ranh giới ${toVietnameseLabel(target.name)} làm vùng phân tích.`);
     setStatusType("ok");
-  };
+  }
 
-  const beginDrawMode = () => {
+  function beginDrawMode() {
     setDrawMode(true);
     setDrawPoints([]);
-    setCustomScope(null);
-    setStatus("Chế độ vẽ vùng đã bật. Hãy click lên bản đồ để đặt các đỉnh polygon rồi bấm Hoàn tất vùng.");
+    setStatus("Chế độ vẽ vùng đã bật. Hãy click lên bản đồ để đặt các đỉnh polygon, sau đó bấm hoàn tất vùng.");
     setStatusType("ok");
-  };
+  }
 
-  const finishDrawArea = () => {
+  function finishDrawArea() {
     const feature = buildPolygonFeature(drawPoints, { name: customName });
     if (!feature) {
       setStatus("Cần ít nhất 3 đỉnh để tạo polygon.");
       setStatusType("warn");
       return;
     }
+
     applyGeometryScope({
       name: customName,
       province: selectedProvince?.name || selectedProvince?.province || customName,
       geometry: feature,
       sourceType: "manual_polygon",
+      point: selectedPoint,
     });
-    setStatus("Đã tạo vùng polygon thủ công.");
+    setStatus("Đã tạo vùng polygon thủ công thành công.");
     setStatusType("ok");
-  };
+  }
 
-  const clearCustomArea = () => {
-    setCustomScope(null);
-    setDrawMode(false);
-    setDrawPoints([]);
-    writeSelectedAnalysisScope(buildLocationAnalysisScope(selectedProvince || DEFAULT_LOCATION));
-  };
+  function removeLastDrawPoint() {
+    setDrawPoints((current) => current.slice(0, -1));
+  }
 
-  const saveCurrentAreaToHistory = async () => {
-    if (!customScope || !token) return;
+  function createRadiusArea() {
+    const center = selectedPoint || currentPosition;
+    const radiusValue = Number(radiusKm);
+    if (!center) {
+      setStatus("Hãy chọn một điểm trên bản đồ, dùng tìm kiếm text hoặc lấy vị trí hiện tại trước khi tạo bán kính.");
+      setStatusType("warn");
+      return;
+    }
+    if (!Number.isFinite(radiusValue) || radiusValue <= 0) {
+      setStatus("Bán kính phải lớn hơn 0 km.");
+      setStatusType("warn");
+      return;
+    }
+
+    const feature = createCircleFeature(center.lat, center.lng, radiusValue, 72, {
+      name: `Vùng bán kính ${radiusValue} km`,
+    });
+    applyGeometryScope({
+      name: `Vùng bán kính ${radiusValue} km`,
+      province: selectedProvince?.name || selectedProvince?.province || "Vùng bán kính",
+      geometry: feature,
+      sourceType: "radius_buffer",
+      point: center,
+      radiusKm: radiusValue,
+    });
+    setStatus(`Đã tạo vùng bán kính ${radiusValue} km quanh điểm đang chọn.`);
+    setStatusType("ok");
+  }
+
+  async function saveCurrentAreaToHistory() {
+    if (!customScope || !token) {
+      setStatus("Cần đăng nhập và chọn một vùng geometry trước khi lưu lịch sử.");
+      setStatusType("warn");
+      return;
+    }
+
     try {
       const response = await apiClient.post(
         "/analysis-areas/history",
@@ -368,11 +637,16 @@ export default function MapPage() {
           source_type: customScope.sourceType,
           boundary_code: customScope.boundaryCode,
           location_id: customScope.locationId,
+          metadata: {
+            point: customScope.point,
+            radius_km: customScope.radiusKm,
+            address: customScope.address,
+          },
         },
         { headers: authHeaders(token) }
       );
       const historyRow = response.data?.data;
-      setRecentAreas((current) => [historyRow, ...current.filter((item) => item.id !== historyRow?.id)].slice(0, 8));
+      setRecentAreas((current) => [historyRow, ...current.filter((item) => item.id !== historyRow?.id)].slice(0, 10));
       applyGeometryScope({ ...customScope, historyId: historyRow?.id });
       setStatus("Đã lưu vùng phân tích vào lịch sử tài khoản.");
       setStatusType("ok");
@@ -380,15 +654,14 @@ export default function MapPage() {
       setStatus(error.response?.data?.error?.message || "Không lưu được vùng phân tích vào lịch sử.");
       setStatusType("error");
     }
-  };
+  }
 
-  const handleGeoJsonUpload = async (event) => {
+  async function handleGeoJsonUpload(event) {
     const file = event.target.files?.[0];
     if (!file) return;
     try {
       const payload = await readGeoJsonFile(file);
       const nextName = file.name.replace(/\.[^.]+$/, "") || customName;
-      setCustomName(nextName);
       applyGeometryScope({
         name: nextName,
         province: selectedProvince?.name || selectedProvince?.province || nextName,
@@ -403,171 +676,418 @@ export default function MapPage() {
     } finally {
       event.target.value = "";
     }
-  };
+  }
 
-  const openModule = (path) => {
-    const scope = customScope ? buildGeometryAnalysisScope(customScope) : buildLocationAnalysisScope(selectedProvince || selectedLocation);
-    if (scope) writeSelectedAnalysisScope(scope);
+  async function loadThematicLayer() {
+    setLayerLoading(true);
+    try {
+      const response = await apiClient.post("/map/layer", {
+        data_type: layerForm.dataType,
+        metric: layerForm.metric,
+        start_date: layerForm.startDate,
+        end_date: layerForm.endDate,
+        ...buildSpatialScopePayload(),
+      });
+      const payload = response.data?.data || null;
+      setActiveLayer(payload);
+      setStatus(`Đã nạp ${payload?.label || "lớp bản đồ chuyên đề"} từ Google Earth Engine.`);
+      setStatusType("ok");
+      if (selectedPoint) {
+        await loadPointSample(selectedPoint.lat, selectedPoint.lng, layerForm.dataType);
+      }
+    } catch (error) {
+      setActiveLayer(null);
+      setStatus(error.response?.data?.error?.message || "Không tải được lớp bản đồ chuyên đề từ GEE.");
+      setStatusType("error");
+    } finally {
+      setLayerLoading(false);
+    }
+  }
+
+  async function calculateRouteTo(target) {
+    if (!currentPosition) {
+      setStatus("Cần vị trí hiện tại để tính quãng đường thực tế.");
+      setStatusType("warn");
+      return;
+    }
+    if (!target) {
+      setStatus("Chưa có điểm đích để tính quãng đường.");
+      setStatusType("warn");
+      return;
+    }
+
+    setRouteLoading(true);
+    try {
+      const response = await apiClient.get("/map/route", {
+        params: {
+          from_lat: currentPosition.lat,
+          from_lng: currentPosition.lng,
+          to_lat: target.lat,
+          to_lng: target.lng,
+          profile: routeProfile,
+        },
+      });
+      setRouteInfo(response.data?.data || null);
+      setStatus("Đã tính xong quãng đường thực tế trên mạng đường.");
+      setStatusType("ok");
+    } catch (error) {
+      setRouteInfo(null);
+      setStatus(error.response?.data?.error?.message || "Không tính được quãng đường.");
+      setStatusType("error");
+    } finally {
+      setRouteLoading(false);
+    }
+  }
+
+  async function loadHotspots() {
+    const origin = selectedPoint || currentPosition;
+    if (!origin) {
+      setStatus("Hãy chọn một điểm hoặc dùng vị trí hiện tại trước khi tìm hotspot TVDI.");
+      setStatusType("warn");
+      return;
+    }
+
+    setHotspotsLoading(true);
+    try {
+      const response = await apiClient.get("/map/hotspots", {
+        params: {
+          lat: origin.lat,
+          lng: origin.lng,
+          radius_km: radiusKm,
+          start: layerForm.startDate,
+          end: layerForm.endDate,
+          limit: 8,
+          min_tvdi: 0.55,
+        },
+      });
+      setHotspots(response.data?.data?.hotspots || []);
+      setStatus("Đã truy vấn các vùng TVDI cao gần điểm đang chọn.");
+      setStatusType("ok");
+    } catch (error) {
+      setHotspots([]);
+      setStatus(error.response?.data?.error?.message || "Không truy vấn được hotspot TVDI.");
+      setStatusType("error");
+    } finally {
+      setHotspotsLoading(false);
+    }
+  }
+
+  function handleApplyHistory(row) {
+    const scope = historyRowToScope(row);
+    if (!scope) return;
+    applyGeometryScope(scope);
+    setStatus(`Đã nạp vùng gần đây: ${row.name}`);
+    setStatusType("ok");
+  }
+
+  function openModule(path) {
+    if (customScope?.geometry) {
+      writeSelectedAnalysisScope(buildGeometryAnalysisScope(customScope));
+    } else {
+      const target = selectedWard || selectedProvince || selectedLocation || DEFAULT_LOCATION;
+      writeSelectedAnalysisScope(buildLocationAnalysisScope(target));
+    }
     writeSelectedLocation(selectedProvince || selectedLocation || DEFAULT_LOCATION);
     navigate(path);
-  };
+  }
+
+  const currentLayerLegend = activeLayer?.legend || null;
+  const selectedSummaryCenter = getLocationCenter(customScope || selectedWard || selectedProvince || DEFAULT_LOCATION);
 
   return (
     <div className="panel-stack">
       <section className="card page-header">
-        <h1>Bản đồ WebGIS</h1>
-        <p>Click vùng hành chính, vẽ polygon tay hoặc upload GeoJSON để tạo vùng phân tích linh hoạt cho mưa, nhiệt độ, NDVI và TVDI.</p>
+        <h1>Trung tâm WebGIS phân tích không gian</h1>
+        <p>
+          Tìm kiếm địa điểm bằng text, lấy vị trí hiện tại, tạo vùng bán kính hoặc polygon tùy chọn,
+          tính quãng đường và hiển thị các lớp bản đồ lượng mưa, nhiệt độ, độ ẩm đất, NDVI, TVDI ngay trên bản đồ.
+        </p>
       </section>
-      {status && <div className={`status ${statusType}`}>{status}</div>}
 
-      <section className="card map-toolbar">
+      {status ? <div className={`status ${statusType}`}>{status}</div> : null}
+
+      <section className="card map-toolbar map-toolbar--advanced">
+        <div className="field field--wide">
+          <label>Tìm kiếm địa điểm bằng text</label>
+          <div className="map-search-box">
+            <Search size={18} />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Ví dụ: Đại học Bách khoa Đà Nẵng, Hải Châu, Quảng Trị"
+            />
+          </div>
+          {searchLoading ? <span className="field-hint">Đang tìm kiếm tọa độ...</span> : null}
+          {searchResults.length ? (
+            <div className="map-search-results">
+              {searchResults.map((result, index) => (
+                <button
+                  key={`${result.display_name}-${index}`}
+                  type="button"
+                  className="map-search-result"
+                  onClick={() => void handleSearchResultSelect(result)}
+                >
+                  <strong>{result.display_name}</strong>
+                  <span>
+                    {Number(result.lat).toFixed(5)}, {Number(result.lng).toFixed(5)}
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
+
         <div className="field">
-          <label htmlFor="map-province">Tỉnh/Thành</label>
-          <select id="map-province" value={selectedProvinceCode || ""} onChange={(e) => {
-            const province = provinces.find((item) => String(item.boundaryCode || "") === e.target.value);
-            if (province) void handleSelectProvince(province);
+          <label>Tỉnh/thành</label>
+          <select value={selectedProvinceCode} onChange={(event) => {
+            const next = provinces.find((item) => String(item.boundaryCode || "") === String(event.target.value || "")) || provinces[0];
+            handleSelectProvince(next);
           }}>
-            {provinces.map((province) => <option key={`province-option-${province.boundaryCode || province.id}`} value={province.boundaryCode || ""}>{toVietnameseLabel(province.name)}</option>)}
+            {(provinces.length ? provinces : [DEFAULT_LOCATION]).map((item) => (
+              <option key={item.boundaryCode || item.id} value={item.boundaryCode || ""}>
+                {toVietnameseLabel(item.name)}
+              </option>
+            ))}
           </select>
         </div>
+
         <div className="field">
-          <label htmlFor="map-ward">Phường/Xã</label>
-          <select id="map-ward" value={selectedWardCode || ""} disabled={!selectedProvince?.boundaryCode || isWardLoading || !wards.length} onChange={(e) => {
-            const ward = wards.find((item) => String(item.boundaryCode || "") === e.target.value);
-            if (ward) void handleSelectWard(ward);
+          <label>Phường/xã</label>
+          <select value={selectedWardCode} onChange={(event) => {
+            const next = wards.find((item) => String(item.boundaryCode || "") === String(event.target.value || ""));
+            if (next) handleSelectWard(next);
           }}>
-            <option value="">{isWardLoading ? "Đang tải danh sách..." : "Chọn phường/xã để xem chi tiết"}</option>
-            {wards.map((ward) => <option key={`ward-option-${ward.boundaryCode}`} value={ward.boundaryCode}>{toVietnameseLabel(ward.name)}</option>)}
+            <option value="">Tâm tỉnh/thành đang chọn</option>
+            {wards.map((item) => (
+              <option key={item.boundaryCode || item.id} value={item.boundaryCode || ""}>
+                {toVietnameseLabel(item.name)}
+              </option>
+            ))}
+          </select>
+          {isWardLoading ? <span className="field-hint">Đang nạp danh sách phường/xã...</span> : null}
+        </div>
+
+        <div className="field">
+          <label>Bán kính phân tích (km)</label>
+          <input type="number" min="1" step="1" value={radiusKm} onChange={(event) => setRadiusKm(event.target.value)} />
+        </div>
+
+        <div className="field">
+          <label>Kiểu quãng đường</label>
+          <select value={routeProfile} onChange={(event) => setRouteProfile(event.target.value)}>
+            <option value="driving">Ô tô</option>
+            <option value="walking">Đi bộ</option>
+            <option value="cycling">Xe đạp</option>
           </select>
         </div>
+
         <div className="field">
-          <label htmlFor="custom-area-name">Tên vùng tùy chọn</label>
-          <input id="custom-area-name" value={customName} onChange={(e) => setCustomName(e.target.value)} />
+          <label>Từ ngày</label>
+          <input type="date" value={layerForm.startDate} onChange={(event) => setLayerForm((current) => ({ ...current, startDate: event.target.value }))} />
         </div>
-        <div className="map-toolbar__meta">
-          <span className="scope-pill province">Tầng tỉnh: {provinces.length}</span>
-          <span className="scope-pill ward">Tầng phường/xã: {selectedProvince?.boundaryCode ? wards.length : 0}</span>
-          {isWardLoading ? <span className="scope-pill loading"><LoaderCircle size={14} /> Đang tải lớp phường/xã</span> : null}
-          {customScope ? <span className="scope-pill custom">Đang bật geometry mode</span> : null}
+
+        <div className="field">
+          <label>Đến ngày</label>
+          <input type="date" value={layerForm.endDate} onChange={(event) => setLayerForm((current) => ({ ...current, endDate: event.target.value }))} />
+        </div>
+
+        <div className="field">
+          <label>Lớp bản đồ chuyên đề</label>
+          <select value={layerForm.dataType} onChange={(event) => setLayerForm((current) => ({ ...current, dataType: event.target.value }))}>
+            {THEMATIC_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="field">
+          <label>Metric độ ẩm đất</label>
+          <select value={layerForm.metric} onChange={(event) => setLayerForm((current) => ({ ...current, metric: event.target.value }))} disabled={layerForm.dataType !== "soil_moisture"}>
+            <option value="surface">Bề mặt</option>
+            <option value="rootzone">Tầng rễ</option>
+            <option value="profile">Toàn profile</option>
+          </select>
         </div>
       </section>
 
       <section className="card map-toolbelt">
         <div className="map-toolbelt__group">
-          <button type="button" className="btn btn-secondary" onClick={useSelectedBoundaryAsScope}><Target size={16} /> Dùng vùng đang chọn</button>
-          <button type="button" className="btn btn-secondary" onClick={beginDrawMode}><PencilLine size={16} /> Vẽ polygon tay</button>
-          <button type="button" className="btn btn-secondary" onClick={finishDrawArea} disabled={drawPoints.length < 3}>Hoàn tất vùng</button>
-          <button type="button" className="btn btn-secondary" onClick={clearCustomArea}><X size={16} /> Xóa vùng</button>
+          <button type="button" className="btn btn-primary" onClick={() => void handleUseCurrentLocation()} disabled={locating}>
+            {locating ? <LoaderCircle size={18} className="spin" /> : <LocateFixed size={18} />} Vị trí hiện tại
+          </button>
+          <button type="button" className="btn btn-secondary" onClick={useSelectedBoundaryAsScope}><Target size={18} /> Dùng ranh giới đang chọn</button>
+          <button type="button" className="btn btn-secondary" onClick={beginDrawMode}><PencilLine size={18} /> Vẽ polygon</button>
+          <button type="button" className="btn btn-secondary" onClick={finishDrawArea} disabled={drawPoints.length < 3}><ArrowRight size={18} /> Hoàn tất vùng</button>
+          <button type="button" className="btn btn-secondary" onClick={removeLastDrawPoint} disabled={!drawPoints.length}><X size={18} /> Xóa đỉnh cuối</button>
+          <button type="button" className="btn btn-secondary" onClick={createRadiusArea}><Radar size={18} /> Tạo vùng bán kính</button>
+          <label className="btn btn-secondary map-upload-button"><Upload size={18} /> Upload GeoJSON<input type="file" accept=".geojson,.json" onChange={(event) => void handleGeoJsonUpload(event)} /></label>
+          <button type="button" className="btn btn-secondary" onClick={() => void loadThematicLayer()} disabled={layerLoading}>{layerLoading ? <LoaderCircle size={18} className="spin" /> : <Layers3 size={18} />} Tải lớp bản đồ</button>
+          <button type="button" className="btn btn-secondary" onClick={() => void loadHotspots()} disabled={hotspotsLoading}>{hotspotsLoading ? <LoaderCircle size={18} className="spin" /> : <Radar size={18} />} Tìm hotspot TVDI</button>
+          <button type="button" className="btn btn-secondary" onClick={() => void calculateRouteTo(selectedPoint)} disabled={routeLoading || !selectedPoint}>{routeLoading ? <LoaderCircle size={18} className="spin" /> : <Route size={18} />} Tính quãng đường</button>
+          <button type="button" className="btn btn-secondary" onClick={() => void saveCurrentAreaToHistory()} disabled={!customScope || !token}><Save size={18} /> Lưu vùng gần đây</button>
+          <button type="button" className="btn btn-danger" onClick={resetCustomScope}><X size={18} /> Xóa vùng tùy chọn</button>
         </div>
         <div className="map-toolbelt__group">
-          <label className="btn btn-secondary map-upload-button">
-            <Upload size={16} /> Upload GeoJSON
-            <input type="file" accept=".json,.geojson,application/geo+json,application/json" onChange={handleGeoJsonUpload} />
-          </label>
-          <button type="button" className="btn btn-primary" onClick={saveCurrentAreaToHistory} disabled={!customScope || !token}>Lưu vùng vào lịch sử</button>
+          <div className="scope-pill province">Tỉnh: {toVietnameseLabel(selectedProvince?.name || DEFAULT_LOCATION.name)}</div>
+          {selectedWard ? <div className="scope-pill ward">Phường/xã: {toVietnameseLabel(selectedWard.name)}</div> : null}
+          {customScope ? <div className="scope-pill custom">Vùng phân tích: {customScope.name}</div> : null}
+          {drawMode ? <div className="scope-pill loading">Đang vẽ polygon: {drawPoints.length} đỉnh</div> : null}
         </div>
       </section>
 
       <section className="map-layout">
-        <div className="card map-shell">
-          <MapContainer center={selectedCenter || DEFAULT_CENTER} zoom={selectedZoom} zoomControl={false} className="map-canvas">
-            <ZoomControl position="bottomright" />
-            <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-            <MapFocusController center={selectedCenter || DEFAULT_CENTER} zoom={selectedZoom} />
-            <MapDrawRecorder active={drawMode} onPointAdd={(point) => setDrawPoints((current) => [...current, point])} />
-            {provinces.map((province) => {
-              const center = getLocationCenter(province);
-              const selected = String(selectedProvince?.boundaryCode || "") === String(province.boundaryCode || "");
-              const geoJson = normalizeGeoJson(province.geometry);
-              return (
-                <Fragment key={`province-${province.boundaryCode || province.id}`}>
-                  {geoJson ? <GeoJSON data={geoJson} eventHandlers={{ click: () => void handleSelectProvince(province) }} style={() => ({ color: selected ? "#0b5d7a" : "#00796b", weight: selected ? 3.2 : 1.8, fillColor: selected ? "#80deea" : "#a5d6a7", fillOpacity: selected ? 0.32 : 0.1 })} /> : null}
-                  <CircleMarker center={center} radius={selected ? 9 : 6} pathOptions={{ color: selected ? "#0f2132" : "#0077b6", weight: 2, fillColor: selected ? "#f57c00" : "#00a676", fillOpacity: 0.92 }} eventHandlers={{ click: () => void handleSelectProvince(province) }}>
-                    <Popup><strong>{toVietnameseLabel(province.name)}</strong><br />{hasGeometry(province) ? "Có ranh giới cấp tỉnh" : "Đang dùng điểm trung tâm"}</Popup>
-                  </CircleMarker>
-                </Fragment>
-              );
-            })}
-            {wards.map((ward) => {
-              const center = getLocationCenter(ward);
-              const selected = String(selectedWard?.boundaryCode || "") === String(ward.boundaryCode || "");
-              const geoJson = normalizeGeoJson(ward.geometry);
-              return (
-                <Fragment key={`ward-${ward.boundaryCode || ward.id}`}>
-                  {geoJson ? <GeoJSON data={geoJson} eventHandlers={{ click: () => void handleSelectWard(ward) }} style={() => ({ color: selected ? "#ef6c00" : "#1565c0", weight: selected ? 2.4 : 1.4, fillColor: selected ? "#ffcc80" : "#bbdefb", fillOpacity: selected ? 0.38 : 0.18 })} /> : null}
-                  <CircleMarker center={center} radius={selected ? 7 : 4} pathOptions={{ color: selected ? "#8d4f00" : "#1565c0", weight: 1.5, fillColor: selected ? "#ff9800" : "#90caf9", fillOpacity: 0.92 }} eventHandlers={{ click: () => void handleSelectWard(ward) }}>
-                    <Popup><strong>{toVietnameseLabel(ward.name)}</strong><br />{toVietnameseLabel(ward.province)}</Popup>
-                  </CircleMarker>
-                </Fragment>
-              );
-            })}
-            {drawPoints.length > 1 ? <Polyline positions={drawPoints} pathOptions={{ color: "#ef6c00", weight: 3 }} /> : null}
-            {drawingPreview ? <Polygon positions={drawPoints} pathOptions={{ color: "#ef6c00", weight: 2.5, fillOpacity: 0.16 }} /> : null}
-            {drawPoints.map((point, index) => <CircleMarker key={`draw-point-${index}`} center={point} radius={4} pathOptions={{ color: "#ef6c00", fillColor: "#ff9800", fillOpacity: 1 }} />)}
-            {customScope?.geometry ? <GeoJSON data={normalizeGeoJson(customScope.geometry)} style={() => ({ color: "#8e24aa", weight: 3, fillColor: "#ce93d8", fillOpacity: 0.25 })} /> : null}
-          </MapContainer>
-        </div>
+        <article className="card map-shell">
+          <div className="map-canvas">
+            <MapContainer center={mapView.center} zoom={mapView.zoom} zoomControl={false} style={{ height: "100%", width: "100%" }}>
+              <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+              {activeLayer?.tile_url ? <TileLayer url={activeLayer.tile_url} opacity={Number(layerOpacity)} /> : null}
+              <ZoomControl position="bottomright" />
+              <MapFocusController center={mapView.center} zoom={mapView.zoom} />
+              <MapInteractionController drawMode={drawMode} onDrawPoint={(point) => setDrawPoints((current) => [...current, point])} onPickPoint={(point) => void resolvePointContext(point.lat, point.lng)} />
+
+              {selectedBoundaryFeature ? <GeoJSON data={selectedBoundaryFeature} style={() => ({ color: "#1565c0", weight: 2, fillColor: "#bbdefb", fillOpacity: 0.18 })} /> : null}
+              {customFeature ? <GeoJSON data={customFeature} style={() => ({ color: "#7b1fa2", weight: 2.5, fillColor: "#e1bee7", fillOpacity: 0.22 })} /> : null}
+              {drawingPreview ? <GeoJSON data={drawingPreview} style={() => ({ color: "#00796b", weight: 2, dashArray: "10 8", fillColor: "#80cbc4", fillOpacity: 0.18 })} /> : null}
+              {drawPoints.length ? <Polygon positions={drawPoints} pathOptions={{ color: "#00796b", dashArray: "8 8" }} /> : null}
+              {routeLine.length ? <Polyline positions={routeLine} pathOptions={{ color: "#0b5d7a", weight: 5, dashArray: "12 10" }} /> : null}
+
+              {currentPosition ? (
+                <CircleMarker center={[currentPosition.lat, currentPosition.lng]} radius={8} pathOptions={{ color: "#006e4f", fillColor: "#00a676", fillOpacity: 1 }}>
+                  <Popup>Vị trí hiện tại của bạn</Popup>
+                </CircleMarker>
+              ) : null}
+
+              {selectedPoint ? (
+                <CircleMarker center={[selectedPoint.lat, selectedPoint.lng]} radius={8} pathOptions={{ color: "#0f2132", fillColor: "#f57c00", fillOpacity: 1 }}>
+                  <Popup>{selectedPoint.label || "Điểm đã chọn"}</Popup>
+                </CircleMarker>
+              ) : null}
+
+              {hotspots.map((hotspot) => (
+                <CircleMarker key={`${hotspot.location_id}-${hotspot.latest_date}`} center={[hotspot.lat, hotspot.lng]} radius={7} pathOptions={{ color: "#6a1b9a", fillColor: "#ec407a", fillOpacity: 0.95 }}>
+                  <Popup>
+                    <strong>{hotspot.name}</strong>
+                    <br />
+                    TVDI trung bình: {hotspot.avg_tvdi}
+                    <br />
+                    Cách điểm gốc: {formatDistanceKm(hotspot.distance_km)}
+                  </Popup>
+                </CircleMarker>
+              ))}
+            </MapContainer>
+          </div>
+        </article>
 
         <div className="panel-stack">
           <section className="card map-panel">
             <div className="map-panel__header">
               <div>
-                <h3>{toVietnameseLabel((customScope || selectedWard || selectedProvince)?.name)}</h3>
-                <p>{customScope ? `Vùng tùy chọn - ${toVietnameseLabel(customScope.province)}` : selectedWard ? `Thuộc ${toVietnameseLabel(selectedProvince?.name)}` : toVietnameseLabel((selectedProvince || DEFAULT_LOCATION).province)}</p>
+                <h3>Tóm tắt không gian</h3>
+                <p>Thông tin GIS chính của vùng và điểm đang thao tác.</p>
               </div>
-              <span className={`tag ${customScope ? "custom" : hasGeometry(customScope || selectedWard || selectedProvince) ? "ok" : "warn"}`}>{customScope ? "Geometry mode" : selectedWard ? "Cấp phường/xã" : "Cấp tỉnh"}</span>
+              <div className="scope-pill custom">Tâm vùng: {selectedSummaryCenter[0].toFixed(4)}, {selectedSummaryCenter[1].toFixed(4)}</div>
             </div>
-            <p className="map-panel__note">
-              {customScope
-                ? "Các mô-đun phân tích sẽ nhận trực tiếp geometry này thay vì chỉ location_id."
-                : hasGeometry(selectedWard || selectedProvince)
-                  ? "Bạn có thể chuyển ngay vùng đang chọn sang geometry mode bằng nút Dùng vùng đang chọn."
-                  : "Khu vực này chưa có polygon riêng, hệ thống đang dùng point đại diện."}
-            </p>
-            <div className="map-actions">
-              <button type="button" className="btn btn-primary" onClick={() => openModule("/rainfall")}>Mở phân tích mưa <ArrowRight size={16} /></button>
-              <button type="button" className="btn btn-secondary" onClick={() => openModule("/temperature")}>Mở nhiệt độ</button>
-              <button type="button" className="btn btn-secondary" onClick={() => openModule("/ndvi")}>Mở NDVI</button>
-              <button type="button" className="btn btn-secondary" onClick={() => openModule("/tvdi")}>Mở TVDI</button>
+
+            <div className="map-summary">
+              <div className="map-summary__item"><MapPin size={18} /><div><strong>Điểm đang chọn</strong><span>{selectedPoint ? `${selectedPoint.lat.toFixed(5)}, ${selectedPoint.lng.toFixed(5)}` : "Chưa chọn điểm nào"}</span></div></div>
+              <div className="map-summary__item"><Target size={18} /><div><strong>Phạm vi phân tích</strong><span>{customScope ? customScope.name : "Đang dùng ranh giới tỉnh/phường hoặc địa điểm đang chọn"}</span></div></div>
+              <div className="map-summary__item"><Layers3 size={18} /><div><strong>Lớp chuyên đề</strong><span>{activeLayer?.label || "Chưa tải lớp bản đồ nào"}</span></div></div>
             </div>
+
+            {pointAddress?.display_name ? <div className="map-note-block"><strong>Địa chỉ chuẩn hóa</strong><p>{pointAddress.display_name}</p></div> : null}
+            {pointContext?.boundaries?.length ? <div className="map-note-block"><strong>Đơn vị hành chính chứa điểm</strong><p>{pointContext.boundaries.map((item) => item.name).join(" > ")}</p></div> : null}
+            {sampleLoading ? <p className="map-panel__note">Đang lấy giá trị lớp bản đồ tại điểm...</p> : null}
+            {pointSample ? (
+              <div className="map-info-card">
+                <strong>{pointSample.label}</strong>
+                <div className="map-info-card__value">{pointSample.value ?? "Không có dữ liệu"} {pointSample.units || ""}</div>
+                <span>Giai đoạn {layerForm.startDate} đến {layerForm.endDate}</span>
+              </div>
+            ) : null}
+            {routeInfo ? (
+              <div className="map-info-card">
+                <strong>Quãng đường thực tế</strong>
+                <div className="route-summary"><span>{formatDistanceKm(routeInfo.distance_m / 1000)}</span><span>{formatDuration(routeInfo.duration_s)}</span><span>{routeProfile}</span></div>
+              </div>
+            ) : null}
           </section>
 
           <section className="card map-panel">
             <div className="map-panel__header">
-              <div><h3>Lớp phường/xã</h3><p>{toVietnameseLabel(selectedProvince?.name)}</p></div>
-              <span className={`tag ${wardsWithGeometry > 0 ? "ok" : "warn"}`}>{wards.length} đối tượng</span>
+              <div>
+                <h3>Lớp bản đồ chuyên đề</h3>
+                <p>Heatmap theo từng tính chất khí hậu được lấy trực tiếp từ GEE.</p>
+              </div>
+              {activeLayer ? <div className="tag ok">Đang hiển thị</div> : null}
             </div>
-            <div className="location-list">
-              {wards.map((ward) => {
-                const selected = String(selectedWard?.boundaryCode || "") === String(ward.boundaryCode || "");
-                return (
-                  <button key={`ward-item-${ward.boundaryCode || ward.id}`} type="button" className={`location-item ${selected ? "active" : ""}`} onClick={() => void handleSelectWard(ward)}>
-                    <div><strong>{toVietnameseLabel(ward.name)}</strong><span>{toVietnameseLabel(ward.province)}</span></div>
-                    <span className={`tag ${hasGeometry(ward) ? "ok" : "warn"}`}>{hasGeometry(ward) ? "Polygon" : "Point"}</span>
-                  </button>
-                );
-              })}
-              {!isWardLoading && !wards.length ? <div className="location-list__empty">Chọn một tỉnh/thành có dữ liệu chi tiết để xem danh sách phường/xã.</div> : null}
+
+            <div className="field">
+              <label>Độ mờ lớp bản đồ</label>
+              <input type="range" min="0.2" max="1" step="0.05" value={layerOpacity} onChange={(event) => setLayerOpacity(event.target.value)} />
             </div>
+
+            {currentLayerLegend ? (
+              <div className="layer-legend-box">
+                <div className="layer-legend-box__gradient" style={{ background: `linear-gradient(90deg, ${currentLayerLegend.palette.join(", ")})` }} />
+                <div className="layer-legend-box__labels"><span>{currentLayerLegend.min} {currentLayerLegend.units || ""}</span><span>{currentLayerLegend.max} {currentLayerLegend.units || ""}</span></div>
+                <div className="map-mini-grid">
+                  <div className="map-mini-card"><strong>Min</strong><span>{activeLayer?.statistics?.min ?? "-"}</span></div>
+                  <div className="map-mini-card"><strong>Mean</strong><span>{activeLayer?.statistics?.mean ?? "-"}</span></div>
+                  <div className="map-mini-card"><strong>Max</strong><span>{activeLayer?.statistics?.max ?? "-"}</span></div>
+                </div>
+              </div>
+            ) : <p className="map-panel__note">Chưa có lớp chuyên đề nào được hiển thị.</p>}
           </section>
 
           <section className="card map-panel">
             <div className="map-panel__header">
-              <div><h3>Vùng gần đây</h3><p>Lưu theo tài khoản đăng nhập</p></div>
-              <span className={`tag ${recentAreas.length > 0 ? "ok" : "warn"}`}>{historyLoading ? "Đang tải" : recentAreas.length}</span>
+              <div>
+                <h3>Hotspot TVDI gần nhất</h3>
+                <p>Truy vấn các khu vực TVDI cao trong bán kính quanh điểm đang chọn.</p>
+              </div>
+              <div className="scope-pill ward">Bán kính {radiusKm} km</div>
             </div>
-            <div className="location-list">
-              {recentAreas.map((item) => {
-                const scope = historyRowToScope(item);
-                const selected = String(customScope?.historyId || "") === String(item.id);
-                return (
-                  <button key={`history-area-${item.id}`} type="button" className={`location-item ${selected ? "active" : ""}`} onClick={() => { applyGeometryScope(scope); setCustomName(scope.name); }}>
-                    <div><strong>{toVietnameseLabel(item.name)}</strong><span>{toVietnameseLabel(item.province_name)}</span></div>
-                    <span className="tag custom">{item.source_type}</span>
-                  </button>
-                );
-              })}
-              {!historyLoading && !recentAreas.length ? <div className="location-list__empty">Chưa có vùng phân tích gần đây. Vẽ polygon hoặc upload GeoJSON rồi lưu để thấy danh sách này.</div> : null}
+
+            {hotspots.length ? (
+              <div className="location-list">
+                {hotspots.map((hotspot) => (
+                  <div key={`${hotspot.location_id}-${hotspot.latest_date}`} className="hotspot-item">
+                    <div>
+                      <strong>{hotspot.name}</strong>
+                      <span>{formatDistanceKm(hotspot.distance_km)} • TVDI trung bình {hotspot.avg_tvdi}</span>
+                    </div>
+                    <div className="hotspot-item__actions">
+                      <span className={getHotspotBadge(hotspot.classification)}>{hotspot.classification}</span>
+                      <button type="button" className="btn btn-secondary" onClick={() => { void resolvePointContext(Number(hotspot.lat), Number(hotspot.lng), { label: hotspot.name, source: "hotspot" }); }}>Xem</button>
+                      <button type="button" className="btn btn-secondary" onClick={() => void calculateRouteTo({ lat: hotspot.lat, lng: hotspot.lng })}>Route</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : <p className="map-panel__note">Chưa có hotspot nào hoặc bạn chưa chạy truy vấn hotspot TVDI.</p>}
+          </section>
+
+          <section className="card map-panel">
+            <div className="map-panel__header">
+              <div>
+                <h3>Vùng đã lưu và chuyển màn hình</h3>
+                <p>Mở nhanh các module phân tích hiện có với vùng đang chọn.</p>
+              </div>
+              {historyLoading ? <LoaderCircle size={18} className="spin" /> : null}
+            </div>
+
+            <div className="map-actions map-actions--modules">
+              {MODULE_LINKS.map((item) => <button key={item.path} type="button" className="btn btn-primary" onClick={() => openModule(item.path)}>{item.label}</button>)}
+            </div>
+
+            <div className="location-list recent-list">
+              {recentAreas.length ? recentAreas.map((row) => (
+                <button key={row.id} type="button" className="location-item" onClick={() => handleApplyHistory(row)}>
+                  <div><strong>{row.name}</strong><span>{row.province_name || "Vùng tùy chọn"}</span></div>
+                  <span className="tag custom">Gần đây</span>
+                </button>
+              )) : <div className="location-list__empty">Chưa có vùng nào trong lịch sử tài khoản.</div>}
             </div>
           </section>
         </div>
@@ -575,3 +1095,4 @@ export default function MapPage() {
     </div>
   );
 }
+
