@@ -516,7 +516,7 @@ def get_tvdi_data(geometry, start_date, end_date, location_id):
                     print(f"    âš ï¸ Skip {date}: No LST data")
                     continue
                 
-                # TÃ­nh TVDI Ä‘Æ¡n giáº£n: (LST - LST_min) / (LST_max - LST_min)
+                
                 lst_range = lst_max_val - lst_min_val
                 if lst_range <= 0:
                     print(f"    âš ï¸ Skip {date}: LST range = 0")
