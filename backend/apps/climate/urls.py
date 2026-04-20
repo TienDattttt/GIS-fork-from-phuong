@@ -17,9 +17,14 @@ from .views import (
     DashboardTimeseriesView,
     LocationDetailView,
     LocationsView,
+    ManualEntryDetailView,
+    ManualEntryView,
+    MonitoringStationDetailView,
+    MonitoringStationsView,
     NdviMonthlyView,
     NdviRangeView,
     NdviYearlyView,
+    RainfallCalculationView,
     RainfallCompareLocationsView,
     RainfallComparePeriodsView,
     RainfallMonthlyView,
@@ -39,6 +44,11 @@ from .views import (
 
 
 urlpatterns = [
+    path("climate/stations", MonitoringStationsView.as_view()),
+    path("climate/stations/<int:station_id>", MonitoringStationDetailView.as_view()),
+    path("climate/rainfall/calculate", RainfallCalculationView.as_view()),
+    path("climate/manual-entry", ManualEntryView.as_view()),
+    path("climate/manual-entry/<str:data_type>/<int:record_id>", ManualEntryDetailView.as_view()),
     path("analysis-areas/history", AnalysisAreaHistoryView.as_view()),
     path("boundaries", AdminBoundariesView.as_view()),
     path("boundaries/<int:admin_level>/<str:boundary_code>", AdminBoundaryDetailView.as_view()),

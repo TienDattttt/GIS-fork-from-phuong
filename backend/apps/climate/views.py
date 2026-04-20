@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
-
+from django.db import IntegrityError, ProgrammingError
 from django.db.models import Avg, Count, Max, Min, Q, Sum
 from django.db.models.functions import ExtractMonth, ExtractYear
 from requests import RequestException
@@ -17,7 +17,19 @@ from .geometry_analysis import (
     temperature_geometry_response,
     tvdi_geometry_response,
 )
-from .models import AdminBoundary, Location, NdviData, Province, RainfallData, SoilMoistureData, TemperatureData, TvdiData, Ward
+from .models import (
+    AdminBoundary,
+    Location,
+    MonitoringStation,
+    NdviData,
+    Province,
+    RainfallData,
+    SoilMoistureData,
+    TemperatureData,
+    TvdiData,
+    Ward,
+)
+from .rainfall_formula import calculate_idw_rainfall
 from .services import dashboard_timeseries, ndvi_classification, parse_iso_date, tvdi_classification
 
 
@@ -90,13 +102,193 @@ def _fetch_gee_records(
     return records
 
 
+def _extract_geometry_center(geometry):
+    if not isinstance(geometry, dict):
+        return None, None
+
+    payload = geometry.get("geometry") if geometry.get("type") == "Feature" else geometry
+    coordinates = payload.get("coordinates") if isinstance(payload, dict) else None
+    if not coordinates:
+        return None, None
+
+    points = []
+
+    def collect(value):
+        if not isinstance(value, list):
+            return
+        if len(value) >= 2 and isinstance(value[0], (int, float)) and isinstance(value[1], (int, float)):
+            points.append((float(value[1]), float(value[0])))
+            return
+        for item in value:
+            collect(item)
+
+    collect(coordinates)
+    if not points:
+        return None, None
+
+    lat = sum(point[0] for point in points) / len(points)
+    lng = sum(point[1] for point in points) / len(points)
+    return fixed(lat, 6), fixed(lng, 6)
+
+
+def _resolve_location_center(location):
+    boundary = (
+        AdminBoundary.objects.filter(location_id=location.id)
+        .exclude(centroid_lat__isnull=True)
+        .exclude(centroid_lng__isnull=True)
+        .order_by("admin_level")
+        .values("centroid_lat", "centroid_lng")
+        .first()
+    )
+    if boundary:
+        return fixed(boundary["centroid_lat"], 6), fixed(boundary["centroid_lng"], 6)
+    return _extract_geometry_center(location.geometry)
+
+
+def _serialize_location(location):
+    lat, lng = _resolve_location_center(location)
+    return {
+        "id": location.id,
+        "name": location.name,
+        "province": location.province,
+        "geometry": location.geometry,
+        "centroid_lat": lat,
+        "centroid_lng": lng,
+        "has_geometry": bool(location.geometry),
+    }
+
+
+def _build_manual_location_name(lat: float, lng: float) -> str:
+    return f"Diem nhap tay {fixed(lat, 4)}, {fixed(lng, 4)}"
+
+
+def _get_or_create_manual_location(lat: float, lng: float):
+    lat = fixed(lat, 6)
+    lng = fixed(lng, 6)
+    existing = None
+    for location in Location.objects.filter(province="Vung nhap tay"):
+        center_lat, center_lng = _extract_geometry_center(location.geometry)
+        if center_lat is None or center_lng is None:
+            continue
+        if abs(center_lat - lat) < 0.000001 and abs(center_lng - lng) < 0.000001:
+            existing = location
+            break
+
+    if existing:
+        return existing
+
+    return Location.objects.create(
+        name=_build_manual_location_name(lat, lng),
+        province="Vung nhap tay",
+        geometry={
+            "type": "Feature",
+            "properties": {"source": "manual-entry"},
+            "geometry": {"type": "Point", "coordinates": [lng, lat]},
+        },
+    )
+
+
+def _validate_station_type(value: str) -> str:
+    station_type = (value or "").strip().lower()
+    if station_type not in {"water", "air", "rainfall"}:
+        raise ValueError("Invalid station_type. Allowed values: water, air, rainfall.")
+    return station_type
+
+
+def _serialize_station(station):
+    return {
+        "id": station.id,
+        "name": station.name,
+        "station_type": station.station_type,
+        "lat": fixed(station.lat, 6),
+        "lon": fixed(station.lon, 6),
+        "rainfall_mm": fixed(station.rainfall_mm, 4) if station.rainfall_mm is not None else None,
+        "source_description": station.source_description,
+        "address": station.address,
+        "created_at": station.created_at,
+    }
+
+
+def _monitoring_station_schema_response():
+    return fail(
+        "Bảng monitoring_stations chưa được khởi tạo. Hãy chạy bootstrap_monitoring_stations.sql trước.",
+        503,
+        "schema_missing",
+    )
+
+
+MANUAL_DATA_TYPE_CONFIG = {
+    "rainfall": {
+        "model": RainfallData,
+        "field": "rainfall_mm",
+        "serialize_value": lambda row: to_float(row.rainfall_mm),
+        "apply_value": lambda row, value: setattr(row, "rainfall_mm", value),
+        "date_field": "date",
+        "source_station_field": "source_station_id",
+    },
+    "temperature": {
+        "model": TemperatureData,
+        "field": "temp_mean",
+        "serialize_value": lambda row: to_float(row.temp_mean),
+        "apply_value": lambda row, value: (
+            setattr(row, "temp_mean", value),
+            setattr(row, "temp_min", value),
+            setattr(row, "temp_max", value),
+        ),
+        "date_field": "date",
+        "source_station_field": "source_station_id",
+    },
+    "soil_moisture": {
+        "model": SoilMoistureData,
+        "field": "sm_surface",
+        "serialize_value": lambda row: to_float(row.sm_surface),
+        "apply_value": lambda row, value: (
+            setattr(row, "sm_surface", value),
+            setattr(row, "sm_rootzone", value),
+            setattr(row, "sm_profile", value),
+        ),
+        "date_field": "date",
+        "source_station_field": "source_station_id",
+    },
+    "ndvi": {
+        "model": NdviData,
+        "field": "ndvi_mean",
+        "serialize_value": lambda row: to_float(row.ndvi_mean),
+        "apply_value": lambda row, value: (
+            setattr(row, "ndvi_mean", value),
+            setattr(row, "ndvi_min", value),
+            setattr(row, "ndvi_max", value),
+            setattr(row, "ndvi_stddev", 0.0),
+            setattr(row, "vegetation_area_pct", max(0.0, min(100.0, value * 100))),
+        ),
+        "date_field": "date",
+        "source_station_field": "source_station_id",
+    },
+}
+
+
+def _serialize_manual_entry(data_type: str, row):
+    station_name = getattr(getattr(row, "source_station", None), "name", None)
+    return {
+        "id": row.id,
+        "data_type": data_type,
+        "location_id": row.location_id,
+        "location_name": getattr(row.location, "name", None),
+        "location_province": getattr(row.location, "province", None),
+        "date": row.date,
+        "value": MANUAL_DATA_TYPE_CONFIG[data_type]["serialize_value"](row),
+        "notes": getattr(row, "notes", None),
+        "source_station_id": getattr(row, "source_station_id", None),
+        "source_station_name": station_name,
+        "source": row.source,
+    }
+
+
 class LocationsView(APIView):
     permission_classes = []
 
     def get(self, request):
-        rows = list(Location.objects.values("id", "name", "province", "geometry").order_by("name"))
-        for row in rows:
-            row["has_geometry"] = bool(row.get("geometry"))
+        rows = [_serialize_location(location) for location in Location.objects.order_by("name")]
         return ok(rows)
 
 
@@ -104,10 +296,10 @@ class LocationDetailView(APIView):
     permission_classes = []
 
     def get(self, request, location_id: int):
-        location = Location.objects.filter(id=location_id).values().first()
+        location = Location.objects.filter(id=location_id).first()
         if not location:
             return fail("Location not found", 404, "not_found")
-        return ok(location)
+        return ok(_serialize_location(location))
 
 
 class AdminBoundariesView(APIView):
@@ -220,6 +412,267 @@ class StandardWardsView(APIView):
             .order_by("code")[:limit]
         )
         return ok(rows)
+
+
+class MonitoringStationsView(APIView):
+    permission_classes = []
+
+    def get(self, request):
+        station_type = request.query_params.get("station_type")
+        try:
+            queryset = MonitoringStation.objects.all().order_by("name", "id")
+            if station_type:
+                try:
+                    queryset = queryset.filter(station_type=_validate_station_type(station_type))
+                except ValueError as exc:
+                    return fail(str(exc), 400, "validation_error")
+            return ok([_serialize_station(station) for station in queryset])
+        except ProgrammingError:
+            return _monitoring_station_schema_response()
+
+    def post(self, request):
+        data = request.data or {}
+        name = (data.get("name") or "").strip()
+        source_description = (data.get("source_description") or "").strip() or None
+        address = (data.get("address") or "").strip() or None
+
+        if not name:
+            return fail("Missing required field: name", 400, "validation_error")
+
+        try:
+            station = MonitoringStation.objects.create(
+                name=name,
+                station_type=_validate_station_type(data.get("station_type")),
+                lat=float(data.get("lat")),
+                lon=float(data.get("lon")),
+                rainfall_mm=float(data.get("rainfall_mm")) if data.get("rainfall_mm") not in (None, "") else None,
+                source_description=source_description,
+                address=address,
+            )
+        except ValueError as exc:
+            return fail(str(exc), 400, "validation_error")
+        except (TypeError, OverflowError):
+            return fail("Invalid lat/lon/rainfall_mm. Must be numeric.", 400, "validation_error")
+        except ProgrammingError:
+            return _monitoring_station_schema_response()
+
+        return ok(_serialize_station(station), 201)
+
+
+class MonitoringStationDetailView(APIView):
+    permission_classes = []
+
+    def put(self, request, station_id: int):
+        try:
+            station = MonitoringStation.objects.filter(id=station_id).first()
+        except ProgrammingError:
+            return _monitoring_station_schema_response()
+        if not station:
+            return fail("Monitoring station not found", 404, "not_found")
+
+        data = request.data or {}
+        name = (data.get("name") or station.name or "").strip()
+        if not name:
+            return fail("Missing required field: name", 400, "validation_error")
+
+        try:
+            station.name = name
+            station.station_type = _validate_station_type(data.get("station_type") or station.station_type)
+            station.lat = float(data.get("lat", station.lat))
+            station.lon = float(data.get("lon", station.lon))
+            rainfall_value = data.get("rainfall_mm", station.rainfall_mm)
+            station.rainfall_mm = float(rainfall_value) if rainfall_value not in (None, "") else None
+        except ValueError as exc:
+            return fail(str(exc), 400, "validation_error")
+        except (TypeError, OverflowError):
+            return fail("Invalid lat/lon/rainfall_mm. Must be numeric.", 400, "validation_error")
+        except ProgrammingError:
+            return _monitoring_station_schema_response()
+
+        station.source_description = (data.get("source_description") or station.source_description or "").strip() or None
+        station.address = (data.get("address") or station.address or "").strip() or None
+        try:
+            station.save(update_fields=["name", "station_type", "lat", "lon", "rainfall_mm", "source_description", "address"])
+        except ProgrammingError:
+            return _monitoring_station_schema_response()
+        return ok(_serialize_station(station))
+
+    def delete(self, request, station_id: int):
+        try:
+            station = MonitoringStation.objects.filter(id=station_id).first()
+        except ProgrammingError:
+            return _monitoring_station_schema_response()
+        if not station:
+            return fail("Monitoring station not found", 404, "not_found")
+        try:
+            station.delete()
+        except IntegrityError:
+            return fail(
+                "Cannot delete station because it is still referenced by existing manual records.",
+                409,
+                "conflict",
+            )
+        except ProgrammingError:
+            return _monitoring_station_schema_response()
+        return ok({"deleted": True, "id": station_id})
+
+
+class RainfallCalculationView(APIView):
+    permission_classes = []
+
+    def post(self, request):
+        data = request.data or {}
+        stations = data.get("stations")
+
+        try:
+            target_lat = float(data.get("target_lat"))
+            target_lon = float(data.get("target_lon"))
+        except (TypeError, ValueError):
+            return fail("Invalid target_lat/target_lon. Must be numeric.", 400, "validation_error")
+
+        if not isinstance(stations, list) or not stations:
+            return fail("Stations must be a non-empty array.", 400, "validation_error")
+
+        normalized = []
+        try:
+            for station in stations:
+                normalized.append(
+                    {
+                        "lat": float(station.get("lat")),
+                        "lon": float(station.get("lon")),
+                        "rainfall_mm": float(station.get("rainfall_mm")),
+                    }
+                )
+        except (AttributeError, TypeError, ValueError):
+            return fail("Each station must include numeric lat, lon, rainfall_mm.", 400, "validation_error")
+
+        try:
+            result = calculate_idw_rainfall(target_lat, target_lon, normalized)
+        except ValueError as exc:
+            return fail(str(exc), 400, "validation_error")
+
+        payload = {
+            "estimated_rainfall_mm": fixed(result["estimated_rainfall_mm"], 4),
+            "formula_used": result["formula_used"],
+            "computation_steps": [
+                {
+                    **step,
+                    "Pi": fixed(step["Pi"], 4) if step.get("Pi") is not None else None,
+                    "distance_km": fixed(step["distance_km"], 6) if step.get("distance_km") is not None else None,
+                    "weight": fixed(step["weight"], 10) if step.get("weight") is not None else None,
+                    "weighted_term": fixed(step["weighted_term"], 10) if step.get("weighted_term") is not None else None,
+                    "contribution_mm": fixed(step["contribution_mm"], 6) if step.get("contribution_mm") is not None else None,
+                }
+                for step in result["computation_steps"]
+            ],
+        }
+        return ok(payload)
+
+
+class ManualEntryView(APIView):
+    permission_classes = []
+
+    def get(self, request):
+        data_type = (request.query_params.get("data_type") or "").strip()
+        config = MANUAL_DATA_TYPE_CONFIG.get(data_type)
+        if not config:
+            return fail(
+                "Invalid data_type.",
+                400,
+                "validation_error",
+                {"allowed": sorted(MANUAL_DATA_TYPE_CONFIG)},
+            )
+
+        queryset = (
+            config["model"].objects.select_related("location", "source_station")
+            .filter(source="manual")
+            .order_by("-id")
+        )
+        location_id = request.query_params.get("location_id")
+        if location_id:
+            try:
+                queryset = queryset.filter(location_id=_parse_int_param(location_id, "location_id", minimum=1))
+            except ValueError as exc:
+                return fail(str(exc), 400, "validation_error")
+
+        rows = [_serialize_manual_entry(data_type, row) for row in queryset[:20]]
+        return ok(rows)
+
+    def post(self, request):
+        data = request.data or {}
+        data_type = (data.get("data_type") or "").strip()
+        config = MANUAL_DATA_TYPE_CONFIG.get(data_type)
+        if not config:
+            return fail(
+                "Invalid data_type.",
+                400,
+                "validation_error",
+                {"allowed": sorted(MANUAL_DATA_TYPE_CONFIG)},
+            )
+
+        try:
+            entry_date = parse_iso_date(data.get("date"), "date")
+            value = float(data.get("value"))
+        except ValueError as exc:
+            return fail(str(exc), 400, "validation_error")
+        except (TypeError, OverflowError):
+            return fail("Invalid value. Must be numeric.", 400, "validation_error")
+
+        location_id = data.get("location_id")
+        if location_id:
+            try:
+                location = Location.objects.filter(id=_parse_int_param(location_id, "location_id", minimum=1)).first()
+            except ValueError as exc:
+                return fail(str(exc), 400, "validation_error")
+            if not location:
+                return fail("Location not found", 404, "not_found")
+        else:
+            try:
+                lat = float(data.get("lat"))
+                lon = float(data.get("lon"))
+            except (TypeError, ValueError):
+                return fail("Provide either location_id or numeric lat/lon.", 400, "validation_error")
+            location = _get_or_create_manual_location(lat, lon)
+
+        station = None
+        source_station_id = data.get("source_station_id")
+        if source_station_id:
+            try:
+                station = MonitoringStation.objects.filter(
+                    id=_parse_int_param(source_station_id, "source_station_id", minimum=1)
+                ).first()
+            except ValueError as exc:
+                return fail(str(exc), 400, "validation_error")
+            if not station:
+                return fail("Source station not found", 404, "not_found")
+
+        row, _ = config["model"].objects.get_or_create(location_id=location.id, date=entry_date)
+        config["apply_value"](row, value)
+        row.source = "manual"
+        row.notes = (data.get("notes") or "").strip() or None
+        row.source_station_id = station.id if station else None
+        row.save()
+        row = config["model"].objects.select_related("location", "source_station").get(id=row.id)
+        return ok(_serialize_manual_entry(data_type, row), 201)
+
+
+class ManualEntryDetailView(APIView):
+    permission_classes = []
+
+    def delete(self, request, data_type: str, record_id: int):
+        config = MANUAL_DATA_TYPE_CONFIG.get((data_type or "").strip())
+        if not config:
+            return fail(
+                "Invalid data_type.",
+                400,
+                "validation_error",
+                {"allowed": sorted(MANUAL_DATA_TYPE_CONFIG)},
+            )
+
+        deleted, _ = config["model"].objects.filter(id=record_id, source="manual").delete()
+        if not deleted:
+            return fail("Manual entry not found", 404, "not_found")
+        return ok({"deleted": True, "id": record_id, "data_type": data_type})
 
 
 class RainfallRangeView(APIView):

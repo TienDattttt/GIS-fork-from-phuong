@@ -23,6 +23,7 @@ body {
   color: var(--text);
   background: linear-gradient(140deg, var(--bg-start), var(--bg-end));
   min-height: 100vh;
+  overflow-x: hidden;
 }
 
 a {
@@ -74,6 +75,13 @@ a {
   gap: 14px;
 }
 
+.topbar-brand-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .brand {
   font-family: "Space Grotesk", sans-serif;
   font-size: 1.2rem;
@@ -87,6 +95,8 @@ a {
   flex-wrap: wrap;
   gap: 8px;
   margin-left: 14px;
+  flex: 1 1 640px;
+  min-width: 0;
 }
 
 .nav-link {
@@ -108,6 +118,25 @@ a {
   background: rgba(0, 119, 182, 0.14);
 }
 
+.nav-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.nav-toggle:hover {
+  border-color: rgba(0, 119, 182, 0.28);
+  color: var(--primary);
+}
+
 .user-box {
   margin-left: auto;
   display: flex;
@@ -125,6 +154,10 @@ a {
   font-weight: 700;
   cursor: pointer;
   transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 
 .btn:disabled {
@@ -202,13 +235,20 @@ a {
 }
 
 .field input,
-.field select {
+.field select,
+.field textarea {
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 10px 12px;
   font: inherit;
   color: var(--text);
   background: #fff;
+  width: 100%;
+  min-width: 0;
+}
+
+.field textarea {
+  resize: vertical;
 }
 
 .controls .actions {
@@ -216,6 +256,7 @@ a {
   align-items: flex-end;
   gap: 10px;
   grid-column: 1 / -1;
+  flex-wrap: wrap;
 }
 
 .status {
@@ -334,6 +375,14 @@ a {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.95rem;
+  min-width: 640px;
+}
+
+.table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 
 .data-table th,
@@ -351,6 +400,28 @@ a {
 
 .data-table tbody tr:last-child td {
   border-bottom: none;
+}
+
+.table-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.table-actions .btn {
+  flex: 1 1 120px;
+}
+
+.field-note {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.checkbox-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .chip {
@@ -576,6 +647,32 @@ a {
   height: min(72vh, 760px);
   border-radius: 18px;
   overflow: hidden;
+  position: relative;
+}
+
+.map-overlay-control {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 500;
+  min-width: 220px;
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(15, 33, 50, 0.12);
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 14px 28px rgba(15, 33, 50, 0.18);
+  backdrop-filter: blur(10px);
+}
+
+.map-overlay-control__item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  font-size: 0.92rem;
 }
 
 .map-panel {
@@ -683,6 +780,97 @@ a {
   padding: 14px;
   color: var(--muted);
   background: rgba(15, 33, 50, 0.03);
+}
+
+.vector-legend-stack {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.station-form-grid,
+.manual-entry-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  width: 100%;
+}
+
+.station-form-grid__wide,
+.manual-entry-grid__wide {
+  grid-column: 1 / -1;
+}
+
+.station-map-card {
+  padding: 18px;
+}
+
+.station-map-wrapper {
+  height: 360px;
+  overflow: hidden;
+  border-radius: 16px;
+}
+
+.station-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.station-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.station-legend i {
+  width: 12px;
+  height: 12px;
+  display: inline-block;
+  border-radius: 999px;
+}
+
+.station-map-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.station-radius-toolbar {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.station-radius-toolbar__actions,
+.station-radius-toolbar__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.formula-box {
+  display: grid;
+  gap: 10px;
+}
+
+.formula-box__title {
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.formula-box__equation {
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: rgba(0, 119, 182, 0.08);
+  border: 1px solid rgba(0, 119, 182, 0.12);
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 1.05rem;
+  overflow-x: auto;
 }
 
 .location-item {
@@ -806,24 +994,62 @@ a {
   border: 2px solid #0f2132;
 }
 
-@media (max-width: 820px) {
+.controls form,
+.station-form-grid,
+.manual-entry-grid {
+  width: 100%;
+}
+
+.table-card {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.insight-card {
+  overflow: hidden;
+}
+
+.topbar a,
+.nav-toggle,
+.btn,
+.scope-tab,
+.location-item,
+.map-search-result {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.topbar a:focus-visible,
+.nav-toggle:focus-visible,
+.btn:focus-visible,
+.scope-tab:focus-visible,
+.field input:focus-visible,
+.field select:focus-visible,
+.field textarea:focus-visible,
+.location-item:focus-visible,
+.map-search-result:focus-visible {
+  outline: 3px solid rgba(0, 119, 182, 0.18);
+  outline-offset: 2px;
+}
+
+@media (max-width: 1120px) {
   .topbar {
-    top: 8px;
-    margin: 8px;
+    align-items: flex-start;
+  }
+
+  .topbar-brand-row {
+    flex: 1 1 auto;
+  }
+
+  .nav-links {
+    order: 3;
+    flex: 1 1 100%;
+    margin-left: 0;
+    padding-top: 6px;
   }
 
   .user-box {
-    width: 100%;
-    margin-left: 0;
-    justify-content: space-between;
-  }
-
-  .sync-modal {
-    padding: 24px 20px;
-  }
-
-  .data-table {
-    font-size: 0.88rem;
+    order: 2;
+    margin-left: auto;
   }
 
   .map-layout {
@@ -831,7 +1057,163 @@ a {
   }
 
   .map-canvas {
+    height: min(62vh, 680px);
+  }
+
+  .map-overlay-control {
+    min-width: 0;
+    max-width: min(320px, calc(100% - 28px));
+  }
+}
+
+@media (max-width: 820px) {
+  .topbar {
+    top: 8px;
+    margin: 8px;
+    padding: 12px 14px;
+  }
+
+  .topbar-brand-row {
+    width: 100%;
+  }
+
+  .nav-toggle {
+    display: inline-flex;
+  }
+
+  .nav-links {
+    display: none;
+    width: 100%;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 2px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(15, 33, 50, 0.08);
+  }
+
+  .nav-links.open {
+    display: flex;
+  }
+
+  .nav-link {
+    width: 100%;
+    padding: 10px 12px;
+  }
+
+  .user-box {
+    display: none;
+    width: 100%;
+    margin-left: 0;
+    justify-content: space-between;
+    padding-top: 10px;
+    border-top: 1px solid rgba(15, 33, 50, 0.08);
+  }
+
+  .topbar.menu-open .user-box.open {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .topbar.menu-open .user-box.open .btn {
+    width: 100%;
+  }
+
+  .sync-modal {
+    padding: 24px 20px;
+  }
+
+  .container {
+    padding: 18px 14px 24px;
+  }
+
+  .page-header,
+  .chart-card,
+  .map-panel,
+  .table-card,
+  .insight-card,
+  .station-map-card {
+    padding: 16px;
+  }
+
+  .controls {
+    grid-template-columns: 1fr;
+    padding: 16px;
+  }
+
+  .controls .actions {
+    grid-column: auto;
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .controls .actions .btn {
+    width: 100%;
+  }
+
+  .grid-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .chart-grid.two,
+  .split-grid,
+  .subgrid,
+  .map-actions,
+  .map-mini-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .map-toolbar,
+  .map-toolbelt {
+    padding: 16px;
+  }
+
+  .map-toolbelt__group,
+  .map-toolbar__meta,
+  .station-radius-toolbar__actions,
+  .station-radius-toolbar__chips {
+    width: 100%;
+  }
+
+  .map-toolbelt__group .btn,
+  .map-toolbelt__group .map-upload-button,
+  .station-radius-toolbar__actions .btn {
+    flex: 1 1 220px;
+  }
+
+  .map-canvas {
     height: 56vh;
+  }
+
+  .map-overlay-control {
+    left: 12px;
+    right: 12px;
+    top: 12px;
+    max-width: none;
+  }
+
+  .map-panel__header,
+  .location-item,
+  .hotspot-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .station-map-wrapper {
+    height: 320px;
+  }
+
+  .formula-box__equation {
+    font-size: 0.98rem;
+  }
+
+  .data-table {
+    font-size: 0.9rem;
+    min-width: 600px;
+  }
+
+  .table-actions .btn {
+    flex-basis: 160px;
   }
 }
 
@@ -1040,5 +1422,97 @@ a {
   .hotspot-item {
     flex-direction: column;
     align-items: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  .topbar {
+    top: 6px;
+    margin: 6px;
+    padding: 10px 12px;
+    border-radius: 14px;
+  }
+
+  .brand {
+    font-size: 1.05rem;
+  }
+
+  .container {
+    padding: 16px 10px 22px;
+  }
+
+  .page-header,
+  .chart-card,
+  .map-panel,
+  .table-card,
+  .insight-card,
+  .station-map-card,
+  .auth-card {
+    padding: 14px;
+  }
+
+  .grid-4 {
+    grid-template-columns: 1fr;
+  }
+
+  .controls,
+  .map-toolbar,
+  .map-toolbelt {
+    padding: 14px;
+  }
+
+  .map-shell {
+    padding: 8px;
+  }
+
+  .map-canvas {
+    height: 50vh;
+    border-radius: 14px;
+  }
+
+  .station-map-wrapper {
+    height: 300px;
+  }
+
+  .map-summary__item,
+  .location-item,
+  .hotspot-item,
+  .map-note-block,
+  .map-info-card,
+  .map-mini-card {
+    padding: 12px;
+  }
+
+  .formula-box__equation {
+    padding: 12px 14px;
+    font-size: 0.92rem;
+  }
+
+  .sync-modal-backdrop {
+    padding: 14px;
+  }
+
+  .sync-modal {
+    padding: 20px 16px;
+  }
+
+  .data-table {
+    min-width: 560px;
+  }
+
+  .table-actions .btn,
+  .station-map-meta .tag {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

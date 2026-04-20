@@ -30,6 +30,7 @@ import {
 import { useNavigate } from "react-router-dom";
 
 import { apiClient, authHeaders } from "../api/client";
+import SyncProgressModal from "../components/SyncProgressModal";
 import { useAuth } from "../context/AuthContext";
 import {
   buildGeometryAnalysisScope,
@@ -60,6 +61,31 @@ const MODULE_LINKS = [
   { path: "/ndvi", label: "Phân tích NDVI" },
   { path: "/tvdi", label: "Phân tích TVDI" },
 ];
+
+const VECTOR_LAYER_OPTIONS = [
+  { value: "rainfall", label: "Rainfall layer", units: "mm" },
+  { value: "temperature", label: "Temperature layer", units: "°C" },
+  { value: "ndvi", label: "NDVI layer", units: "NDVI" },
+];
+
+function getVectorLayerColor(type, value, min, max) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return "#94a3b8";
+  }
+  const range = max - min || 1;
+  const ratio = Math.max(0, Math.min(1, (numeric - min) / range));
+
+  if (type === "rainfall") {
+    const lightness = 86 - ratio * 46;
+    return `hsl(207 88% ${lightness}%)`;
+  }
+  if (type === "temperature") {
+    const hue = 54 - ratio * 44;
+    return `hsl(${hue} 92% 55%)`;
+  }
+  return `hsl(130 55% ${82 - ratio * 42}%)`;
+}
 
 function boundaryToLocation(boundary, availableLocations = []) {
   const matchedLocation = availableLocations.find(
@@ -106,6 +132,52 @@ function buildPolygonFeature(points, properties = {}) {
     type: "Feature",
     properties,
     geometry: { type: "Polygon", coordinates: [[...coordinates, coordinates[0]]] },
+  };
+}
+
+function buildBoundaryFeatureCollection(items = []) {
+  const features = items.flatMap((item) => {
+    const geoJson = normalizeGeoJson(item?.geometry);
+    if (!geoJson) {
+      return [];
+    }
+
+    if (geoJson.type === "FeatureCollection") {
+      return (geoJson.features || [])
+        .filter((feature) => feature?.geometry)
+        .map((feature) => ({
+          ...feature,
+          properties: {
+            ...(feature.properties || {}),
+            __boundaryCode: item.boundaryCode || item.code || item.id,
+            __boundaryName: item.name,
+            __provinceName: item.province || item.province_name || "",
+          },
+        }));
+    }
+
+    if (geoJson.type === "Feature" && geoJson.geometry) {
+      return [{
+        ...geoJson,
+        properties: {
+          ...(geoJson.properties || {}),
+          __boundaryCode: item.boundaryCode || item.code || item.id,
+          __boundaryName: item.name,
+          __provinceName: item.province || item.province_name || "",
+        },
+      }];
+    }
+
+    return [];
+  });
+
+  if (!features.length) {
+    return null;
+  }
+
+  return {
+    type: "FeatureCollection",
+    features,
   };
 }
 
@@ -186,6 +258,7 @@ export default function MapPage() {
   const navigate = useNavigate();
   const { logActivity, token } = useAuth();
 
+  const [allLocations, setAllLocations] = useState([]);
   const [provinces, setProvinces] = useState([]);
   const [wardMap, setWardMap] = useState({});
   const [selectedProvinceCode, setSelectedProvinceCode] = useState("");
@@ -229,6 +302,11 @@ export default function MapPage() {
   const [layerLoading, setLayerLoading] = useState(false);
   const [activeLayer, setActiveLayer] = useState(null);
   const [layerOpacity, setLayerOpacity] = useState(0.78);
+  const [vectorLayerToggles, setVectorLayerToggles] = useState({ rainfall: false, temperature: false, ndvi: false });
+  const [vectorLayerData, setVectorLayerData] = useState({ rainfall: null, temperature: null, ndvi: null });
+  const [vectorLayerLoading, setVectorLayerLoading] = useState("");
+  const [vectorLayerNotice, setVectorLayerNotice] = useState("");
+  const [vectorSyncing, setVectorSyncing] = useState(false);
 
   const [sampleLoading, setSampleLoading] = useState(false);
   const [pointSample, setPointSample] = useState(null);
@@ -270,6 +348,7 @@ export default function MapPage() {
       try {
         const locationResponse = await apiClient.get("/locations");
         const baseLocations = locationResponse.data?.data || [];
+        setAllLocations(baseLocations);
         let provinceBoundaries = [];
         try {
           const boundaryResponse = await apiClient.get("/boundaries", {
@@ -377,6 +456,10 @@ export default function MapPage() {
   const selectedBoundaryFeature = useMemo(
     () => normalizeGeoJson(selectedWard?.geometry || selectedProvince?.geometry),
     [selectedProvince, selectedWard]
+  );
+  const subordinateBoundaryFeatureCollection = useMemo(
+    () => buildBoundaryFeatureCollection(wards.filter((item) => hasGeometry(item))),
+    [wards]
   );
   const customFeature = useMemo(() => normalizeGeoJson(customScope?.geometry), [customScope]);
   const drawingPreview = useMemo(() => (drawPoints.length >= 3 ? buildPolygonFeature(drawPoints, { name: customName }) : null), [customName, drawPoints]);
@@ -704,6 +787,142 @@ export default function MapPage() {
     }
   }
 
+  async function fetchVectorLayer(type) {
+    if (!allLocations.length) {
+      setVectorLayerNotice("Chưa có location nào trong CSDL để hiển thị lớp vector.");
+      return;
+    }
+
+    const endpointMap = {
+      rainfall: { path: "/rainfall", valueKey: "rainfall_mm", label: "Lượng mưa", units: "mm" },
+      temperature: { path: "/temperature", valueKey: "temp_mean", label: "Nhiệt độ", units: "°C" },
+      ndvi: { path: "/ndvi", valueKey: "ndvi_mean", label: "NDVI", units: "NDVI" },
+    };
+    const config = endpointMap[type];
+    if (!config) {
+      return;
+    }
+
+    setVectorLayerLoading(type);
+    setVectorLayerNotice("");
+    try {
+      const settled = await Promise.allSettled(
+        allLocations.map(async (location) => {
+          const response = await apiClient.get(config.path, {
+            params: {
+              location_id: location.id,
+              start: layerForm.startDate,
+              end: layerForm.endDate,
+              source: "db",
+              province: location.province,
+            },
+          });
+          const rows = response.data?.data?.data || [];
+          const latest = rows[rows.length - 1];
+          if (!latest) {
+            return null;
+          }
+          const [lat, lng] = getLocationCenter(location);
+          if (!Number.isFinite(Number(lat)) || !Number.isFinite(Number(lng))) {
+            return null;
+          }
+          return {
+            locationId: location.id,
+            locationName: location.name,
+            province: location.province,
+            lat: Number(lat),
+            lng: Number(lng),
+            value: Number(latest[config.valueKey] ?? 0),
+            date: latest.date,
+          };
+        })
+      );
+
+      const points = settled
+        .filter((item) => item.status === "fulfilled" && item.value)
+        .map((item) => item.value)
+        .filter((item) => Number.isFinite(item.value));
+
+      if (!points.length) {
+        setVectorLayerData((current) => ({ ...current, [type]: { type, label: config.label, units: config.units, points: [] } }));
+        setVectorLayerNotice(`Chưa có dữ liệu DB cho lớp ${config.label}. Bạn có thể đồng bộ từ GEE để hiển thị lớp này.`);
+        return;
+      }
+
+      const values = points.map((item) => item.value);
+      const min = Math.min(...values);
+      const max = Math.max(...values);
+      const coloredPoints = points.map((item) => ({
+        ...item,
+        color: getVectorLayerColor(type, item.value, min, max),
+      }));
+
+      setVectorLayerData((current) => ({
+        ...current,
+        [type]: {
+          type,
+          label: config.label,
+          units: config.units,
+          points: coloredPoints,
+          legend: { min, max },
+        },
+      }));
+    } catch (error) {
+      setVectorLayerNotice(error.response?.data?.error?.message || "Không tải được lớp vector từ dữ liệu DB.");
+    } finally {
+      setVectorLayerLoading("");
+    }
+  }
+
+  async function toggleVectorLayer(type) {
+    const nextEnabled = !vectorLayerToggles[type];
+    setVectorLayerToggles((current) => ({ ...current, [type]: nextEnabled }));
+    if (nextEnabled && !vectorLayerData[type]) {
+      await fetchVectorLayer(type);
+    }
+  }
+
+  async function syncVectorLayerFromGEE(type) {
+    setVectorSyncing(true);
+    setStatus("");
+    try {
+      const scopePayload = customScope?.geometry
+        ? {
+            geometry: customScope.geometry,
+            area_name: customScope.name,
+            province: customScope.province,
+            source_type: customScope.sourceType,
+            boundary_code: customScope.boundaryCode,
+            history_id: customScope.historyId,
+            location_id: customScope.locationId,
+          }
+        : {
+            province: selectedProvince?.province || selectedProvince?.name || DEFAULT_LOCATION.province,
+            location_id: Number(selectedProvince?.locationId || selectedProvince?.id || DEFAULT_LOCATION.id),
+          };
+
+      await apiClient.post(
+        "/gee/fetch",
+        {
+          ...scopePayload,
+          start_date: layerForm.startDate,
+          end_date: layerForm.endDate,
+          data_types: [type],
+        },
+        token ? { headers: authHeaders(token) } : undefined
+      );
+      await fetchVectorLayer(type);
+      setVectorLayerToggles((current) => ({ ...current, [type]: true }));
+      setStatus(`Đã đồng bộ dữ liệu ${type} từ GEE và làm mới lớp vector từ DB.`);
+      setStatusType("ok");
+    } catch (error) {
+      setStatus(error.response?.data?.error?.message || "Không đồng bộ được dữ liệu từ GEE cho lớp vector.");
+      setStatusType("error");
+    } finally {
+      setVectorSyncing(false);
+    }
+  }
+
   async function calculateRouteTo(target) {
     if (!currentPosition) {
       setStatus("Cần vị trí hiện tại để tính quãng đường thực tế.");
@@ -792,10 +1011,24 @@ export default function MapPage() {
   }
 
   const currentLayerLegend = activeLayer?.legend || null;
+  const activeVectorLayers = VECTOR_LAYER_OPTIONS.filter((option) => vectorLayerToggles[option.value] && vectorLayerData[option.value]);
+  const vectorLegendItems = activeVectorLayers
+    .map((option) => ({
+      type: option.value,
+      label: option.label,
+      units: vectorLayerData[option.value]?.units,
+      legend: vectorLayerData[option.value]?.legend,
+    }))
+    .filter((item) => item.legend);
   const selectedSummaryCenter = getLocationCenter(customScope || selectedWard || selectedProvince || DEFAULT_LOCATION);
 
   return (
     <div className="panel-stack">
+      <SyncProgressModal
+        open={vectorSyncing}
+        title="Đang đồng bộ dữ liệu lớp bản đồ từ GEE"
+        description="Hệ thống đang tải dữ liệu khí hậu về cơ sở dữ liệu để hiển thị lớp vector trên bản đồ."
+      />
       <section className="card page-header">
         <h1>Trung tâm WebGIS phân tích không gian</h1>
         <p>
@@ -939,6 +1172,20 @@ export default function MapPage() {
       <section className="map-layout">
         <article className="card map-shell">
           <div className="map-canvas">
+            <div className="map-overlay-control">
+              <strong>Lớp dữ liệu DB</strong>
+              {VECTOR_LAYER_OPTIONS.map((option) => (
+                <label key={option.value} className="map-overlay-control__item">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(vectorLayerToggles[option.value])}
+                    onChange={() => void toggleVectorLayer(option.value)}
+                  />
+                  <span>{option.label}</span>
+                  {vectorLayerLoading === option.value ? <span className="field-hint">Đang tải...</span> : null}
+                </label>
+              ))}
+            </div>
             <MapContainer center={mapView.center} zoom={mapView.zoom} zoomControl={false} style={{ height: "100%", width: "100%" }}>
               <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
               {activeLayer?.tile_url ? <TileLayer url={activeLayer.tile_url} opacity={Number(layerOpacity)} /> : null}
@@ -946,6 +1193,32 @@ export default function MapPage() {
               <MapFocusController center={mapView.center} zoom={mapView.zoom} />
               <MapInteractionController drawMode={drawMode} onDrawPoint={(point) => setDrawPoints((current) => [...current, point])} onPickPoint={(point) => void resolvePointContext(point.lat, point.lng)} />
 
+              {selectedProvince && subordinateBoundaryFeatureCollection ? (
+                <GeoJSON
+                  key={`sub-boundaries-${selectedProvince.boundaryCode || selectedProvince.id}`}
+                  data={subordinateBoundaryFeatureCollection}
+                  style={(feature) => {
+                    const isActive = String(feature?.properties?.__boundaryCode || "") === String(selectedWardCode || "");
+                    return {
+                      color: isActive ? "#d97706" : "#3b82f6",
+                      weight: isActive ? 2.4 : 1.25,
+                      fillColor: isActive ? "#fdba74" : "#bfdbfe",
+                      fillOpacity: isActive ? 0.18 : 0.08,
+                    };
+                  }}
+                  onEachFeature={(feature, layer) => {
+                    const boundaryCode = feature?.properties?.__boundaryCode;
+                    const ward = wards.find((item) => String(item.boundaryCode || item.id) === String(boundaryCode || ""));
+                    const label = toVietnameseLabel(feature?.properties?.__boundaryName || ward?.name || "Đơn vị hành chính");
+                    layer.bindPopup(`${label}`);
+                    if (ward) {
+                      layer.on({
+                        click: () => handleSelectWard(ward),
+                      });
+                    }
+                  }}
+                />
+              ) : null}
               {selectedBoundaryFeature ? <GeoJSON data={selectedBoundaryFeature} style={() => ({ color: "#1565c0", weight: 2, fillColor: "#bbdefb", fillOpacity: 0.18 })} /> : null}
               {customFeature ? <GeoJSON data={customFeature} style={() => ({ color: "#7b1fa2", weight: 2.5, fillColor: "#e1bee7", fillOpacity: 0.22 })} /> : null}
               {drawingPreview ? <GeoJSON data={drawingPreview} style={() => ({ color: "#00796b", weight: 2, dashArray: "10 8", fillColor: "#80cbc4", fillOpacity: 0.18 })} /> : null}
@@ -975,6 +1248,29 @@ export default function MapPage() {
                   </Popup>
                 </CircleMarker>
               ))}
+
+              {activeVectorLayers.flatMap((option) =>
+                (vectorLayerData[option.value]?.points || []).map((point) => (
+                  <CircleMarker
+                    key={`${option.value}-${point.locationId}-${point.date}`}
+                    center={[point.lat, point.lng]}
+                    radius={6}
+                    pathOptions={{
+                      color: point.color,
+                      fillColor: point.color,
+                      fillOpacity: 0.88,
+                    }}
+                  >
+                    <Popup>
+                      <strong>{toVietnameseLabel(point.locationName)}</strong>
+                      <br />
+                      {option.label}: {point.value.toFixed(4)} {vectorLayerData[option.value]?.units || ""}
+                      <br />
+                      Ngày đọc cuối: {point.date}
+                    </Popup>
+                  </CircleMarker>
+                ))
+              )}
             </MapContainer>
           </div>
         </article>
@@ -1017,7 +1313,7 @@ export default function MapPage() {
             <div className="map-panel__header">
               <div>
                 <h3>Lớp bản đồ chuyên đề</h3>
-                <p>Heatmap theo từng tính chất khí hậu được lấy trực tiếp từ GEE.</p>
+                <p>Tile layer từ GEE và lớp vector màu hóa từ dữ liệu DB được hiển thị song song trên cùng bản đồ.</p>
               </div>
               {activeLayer ? <div className="tag ok">Đang hiển thị</div> : null}
             </div>
@@ -1026,6 +1322,50 @@ export default function MapPage() {
               <label>Độ mờ lớp bản đồ</label>
               <input type="range" min="0.2" max="1" step="0.05" value={layerOpacity} onChange={(event) => setLayerOpacity(event.target.value)} />
             </div>
+
+            {vectorLayerNotice ? (
+              <div className="map-note-block">
+                <strong>Thông báo lớp vector</strong>
+                <p>{vectorLayerNotice}</p>
+                <div className="table-actions">
+                  {VECTOR_LAYER_OPTIONS.filter((option) => vectorLayerToggles[option.value]).map((option) => (
+                    <button
+                      key={`sync-${option.value}`}
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => void syncVectorLayerFromGEE(option.value)}
+                    >
+                      Đồng bộ {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {vectorLegendItems.length ? (
+              <div className="vector-legend-stack">
+                {vectorLegendItems.map((item) => (
+                  <div key={`vector-legend-${item.type}`} className="layer-legend-box">
+                    <strong>{item.label}</strong>
+                    <div
+                      className="layer-legend-box__gradient"
+                      style={{
+                        background:
+                          item.type === "rainfall"
+                            ? "linear-gradient(90deg, hsl(207 88% 86%), hsl(207 88% 40%))"
+                            : item.type === "temperature"
+                              ? "linear-gradient(90deg, hsl(54 92% 55%), hsl(10 92% 55%))"
+                              : "linear-gradient(90deg, hsl(130 55% 82%), hsl(130 55% 40%))",
+                      }}
+                    />
+                    <div className="layer-legend-box__labels">
+                      <span>{Number(item.legend.min || 0).toFixed(4)} {item.units || ""}</span>
+                      <span>{Number(item.legend.max || 0).toFixed(4)} {item.units || ""}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
 
             {currentLayerLegend ? (
               <div className="layer-legend-box">

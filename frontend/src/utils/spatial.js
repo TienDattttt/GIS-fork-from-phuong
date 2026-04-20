@@ -8,6 +8,27 @@ function toDegrees(value) {
   return (Number(value) * 180) / Math.PI;
 }
 
+export function haversineDistanceKm(fromLat, fromLng, toLat, toLng) {
+  const startLat = Number(fromLat);
+  const startLng = Number(fromLng);
+  const endLat = Number(toLat);
+  const endLng = Number(toLng);
+
+  if (![startLat, startLng, endLat, endLng].every((value) => Number.isFinite(value))) {
+    return null;
+  }
+
+  const deltaLat = toRadians(endLat - startLat);
+  const deltaLng = toRadians(endLng - startLng);
+  const startLatRad = toRadians(startLat);
+  const endLatRad = toRadians(endLat);
+  const a =
+    Math.sin(deltaLat / 2) ** 2 +
+    Math.cos(startLatRad) * Math.cos(endLatRad) * Math.sin(deltaLng / 2) ** 2;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return EARTH_RADIUS_KM * c;
+}
+
 export function createCircleFeature(lat, lng, radiusKm, steps = 72, properties = {}) {
   const centerLat = Number(lat);
   const centerLng = Number(lng);

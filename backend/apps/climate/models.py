@@ -114,11 +114,31 @@ class AnalysisAreaHistory(models.Model):
         managed = False
 
 
+class MonitoringStation(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    name = models.CharField(max_length=255)
+    station_type = models.CharField(max_length=20)
+    lat = models.FloatField()
+    lon = models.FloatField()
+    rainfall_mm = models.FloatField(null=True, blank=True)
+    source_description = models.TextField(null=True, blank=True)
+    address = models.TextField(null=True, blank=True)
+    created_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "monitoring_stations"
+        managed = False
+
+
 class RainfallData(models.Model):
     id = models.BigAutoField(primary_key=True)
     location = models.ForeignKey(Location, on_delete=models.DO_NOTHING, db_column="location_id")
     date = models.DateField()
     rainfall_mm = models.FloatField(null=True, blank=True)
+    notes = models.TextField(null=True, blank=True)
+    source_station = models.ForeignKey(
+        MonitoringStation, on_delete=models.DO_NOTHING, db_column="source_station_id", null=True, blank=True
+    )
     source = models.CharField(max_length=100, null=True, blank=True)
 
     class Meta:
@@ -133,6 +153,10 @@ class TemperatureData(models.Model):
     temp_min = models.FloatField(null=True, blank=True)
     temp_max = models.FloatField(null=True, blank=True)
     temp_mean = models.FloatField(null=True, blank=True)
+    notes = models.TextField(null=True, blank=True)
+    source_station = models.ForeignKey(
+        MonitoringStation, on_delete=models.DO_NOTHING, db_column="source_station_id", null=True, blank=True
+    )
     source = models.CharField(max_length=100, null=True, blank=True)
 
     class Meta:
@@ -147,6 +171,10 @@ class SoilMoistureData(models.Model):
     sm_surface = models.FloatField(null=True, blank=True)
     sm_rootzone = models.FloatField(null=True, blank=True)
     sm_profile = models.FloatField(null=True, blank=True)
+    notes = models.TextField(null=True, blank=True)
+    source_station = models.ForeignKey(
+        MonitoringStation, on_delete=models.DO_NOTHING, db_column="source_station_id", null=True, blank=True
+    )
     source = models.CharField(max_length=100, null=True, blank=True)
 
     class Meta:
@@ -163,6 +191,10 @@ class NdviData(models.Model):
     ndvi_max = models.FloatField(null=True, blank=True)
     ndvi_stddev = models.FloatField(null=True, blank=True)
     vegetation_area_pct = models.FloatField(null=True, blank=True)
+    notes = models.TextField(null=True, blank=True)
+    source_station = models.ForeignKey(
+        MonitoringStation, on_delete=models.DO_NOTHING, db_column="source_station_id", null=True, blank=True
+    )
     source = models.CharField(max_length=100, null=True, blank=True)
 
     class Meta:

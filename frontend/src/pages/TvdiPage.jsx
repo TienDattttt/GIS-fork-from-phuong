@@ -15,6 +15,7 @@ import {
   readGeometryScope,
 } from "../utils/geometryAnalysis";
 import { pickPreferredLocation, writeSelectedLocation } from "../utils/locationSelection";
+import { getLocationCenter } from "../utils/mapGeometry";
 import { toVietnameseLabel } from "../utils/viText";
 
 const DEFAULT_LOCATION = { id: 1, name: "Quảng Trị", province: "Quảng Trị" };
@@ -69,6 +70,17 @@ export default function TvdiPage() {
   const [severeEvents, setSevereEvents] = useState([]);
   const locationOptions = locations.length > 0 ? locations : [DEFAULT_LOCATION];
   const usingGeometry = Boolean(geometryScope?.geometry);
+  const selectedLocationCoordinates = useMemo(() => {
+    const scopeTarget = usingGeometry ? geometryScope : locationOptions.find((item) => String(item.id) === String(form.locationId));
+    if (!scopeTarget) {
+      return null;
+    }
+    const [lat, lon] = getLocationCenter(scopeTarget);
+    if (!Number.isFinite(Number(lat)) || !Number.isFinite(Number(lon))) {
+      return null;
+    }
+    return { lat: Number(lat), lon: Number(lon) };
+  }, [form.locationId, geometryScope, locationOptions, usingGeometry]);
 
   useEffect(() => {
     void logActivity("page_view", "tvdi");
@@ -389,6 +401,9 @@ export default function TvdiPage() {
               </option>
             ))}
           </select>
+          {selectedLocationCoordinates ? (
+            <span className="field-note">📍 lat: {selectedLocationCoordinates.lat.toFixed(4)}, lon: {selectedLocationCoordinates.lon.toFixed(4)}</span>
+          ) : null}
         </div>
         <div className="field">
           <label>Từ ngày</label>
