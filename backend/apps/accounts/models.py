@@ -13,6 +13,11 @@ class User(models.Model):
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField()
     last_login = models.DateTimeField(null=True, blank=True)
+    email_verified_at = models.DateTimeField(null=True, blank=True)
+    password_changed_at = models.DateTimeField(null=True, blank=True)
+    last_login_ip = models.CharField(max_length=64, null=True, blank=True)
+    last_login_user_agent = models.TextField(null=True, blank=True)
+    verification_email_sent_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = "users"
@@ -31,3 +36,19 @@ class User(models.Model):
     @property
     def is_anonymous(self):
         return False
+
+
+class AccountEmailToken(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    user = models.ForeignKey(User, on_delete=models.DO_NOTHING, db_column="user_id")
+    token_type = models.CharField(max_length=32)
+    token_hash = models.CharField(max_length=255)
+    expires_at = models.DateTimeField()
+    used_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField()
+    created_ip = models.CharField(max_length=64, null=True, blank=True)
+    created_user_agent = models.TextField(null=True, blank=True)
+
+    class Meta:
+        db_table = "account_email_tokens"
+        managed = False

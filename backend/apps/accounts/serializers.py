@@ -11,3 +11,30 @@ class RegisterSerializer(serializers.Serializer):
 class LoginSerializer(serializers.Serializer):
     username = serializers.CharField(max_length=50)
     password = serializers.CharField(max_length=128)
+
+
+class ResendVerificationSerializer(serializers.Serializer):
+    email = serializers.EmailField(required=False)
+    username = serializers.CharField(required=False, max_length=50)
+
+    def validate(self, attrs):
+        email = (attrs.get("email") or "").strip()
+        username = (attrs.get("username") or "").strip()
+        if not email and not username:
+            raise serializers.ValidationError("Email hoặc tên đăng nhập là bắt buộc.")
+        attrs["email"] = email or None
+        attrs["username"] = username or None
+        return attrs
+
+
+class VerifyEmailSerializer(serializers.Serializer):
+    token = serializers.CharField(max_length=255)
+
+
+class ForgotPasswordSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+
+class ResetPasswordSerializer(serializers.Serializer):
+    token = serializers.CharField(max_length=255)
+    new_password = serializers.CharField(min_length=6, max_length=128)

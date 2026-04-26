@@ -1,6 +1,7 @@
 ﻿from __future__ import annotations
 
 import os
+from email.utils import parseaddr
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -22,6 +23,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "rest_framework",
     "apps.accounts",
+    "apps.admin_portal",
     "apps.activity",
     "apps.climate",
     "apps.gee",
@@ -39,7 +41,16 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = "config.urls"
 
-TEMPLATES: list[dict] = []
+TEMPLATES = [
+    {
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [],
+        },
+    }
+]
 WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 
@@ -85,6 +96,23 @@ REST_FRAMEWORK = {
 
 JWT_SECRET = os.getenv("JWT_SECRET", "")
 JWT_EXPIRES_DAYS = int(os.getenv("JWT_EXPIRES_DAYS", "7"))
+
+EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend")
+EMAIL_HOST = os.getenv("EMAIL_HOST", "")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "true").lower() == "true"
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "Do An GIS <no-reply@example.com>")
+FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "http://127.0.0.1:5173")
+MAILTRAP_API_TOKEN = os.getenv("MAILTRAP_API_TOKEN", "")
+MAILTRAP_API_URL = os.getenv("MAILTRAP_API_URL", "https://send.api.mailtrap.io/api/send")
+
+DEFAULT_FROM_NAME, DEFAULT_FROM_ADDRESS = parseaddr(DEFAULT_FROM_EMAIL)
+if not DEFAULT_FROM_ADDRESS:
+    DEFAULT_FROM_ADDRESS = DEFAULT_FROM_EMAIL
+if not DEFAULT_FROM_NAME:
+    DEFAULT_FROM_NAME = "Do An GIS"
 
 PYTHON_GEE_API_URL = os.getenv("PYTHON_GEE_API_URL", "http://127.0.0.1:3001")
 GEOCODER_SEARCH_URL = os.getenv("GEOCODER_SEARCH_URL", "https://nominatim.openstreetmap.org/search")

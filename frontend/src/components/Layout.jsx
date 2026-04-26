@@ -1,11 +1,12 @@
-import { useEffect, useState } from "react";
-import { LogOut, Menu, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { LogOut, Menu, ShieldCheck, X } from "lucide-react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 
 import { useAuth } from "../context/AuthContext";
 
-const links = [
+const baseLinks = [
   { to: "/", label: "Dashboard", end: true },
+  { to: "/about", label: "Về chúng tôi" },
   { to: "/map", label: "Bản đồ" },
   { to: "/stations", label: "Trạm quan trắc" },
   { to: "/rainfall", label: "Lượng mưa" },
@@ -23,6 +24,13 @@ export default function Layout() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
+
+  const links = useMemo(() => {
+    if (user?.role === "admin") {
+      return [{ to: "/admin", label: "Quản trị", icon: ShieldCheck }, ...baseLinks];
+    }
+    return baseLinks;
+  }, [user?.role]);
 
   useEffect(() => {
     setMenuOpen(false);
@@ -52,16 +60,20 @@ export default function Layout() {
         </div>
 
         <nav className={`nav-links ${menuOpen ? "open" : ""}`}>
-          {links.map((link) => (
-            <NavLink
-              key={link.to}
-              to={link.to}
-              end={link.end}
-              className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}
-            >
-              {link.label}
-            </NavLink>
-          ))}
+          {links.map((link) => {
+            const Icon = link.icon;
+            return (
+              <NavLink
+                key={link.to}
+                to={link.to}
+                end={link.end}
+                className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}
+              >
+                {Icon ? <Icon size={15} /> : null}
+                {link.label}
+              </NavLink>
+            );
+          })}
         </nav>
 
         <div className={`user-box ${menuOpen ? "open" : ""}`}>

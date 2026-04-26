@@ -30,6 +30,7 @@ def healthcheck(request):
                 "ndvi": "/api/ndvi",
                 "tvdi": "/api/tvdi",
                 "dashboard": "/api/dashboard/overview",
+                "admin": "/api/admin",
                 "gee": "/api/gee",
             },
         }
@@ -39,6 +40,7 @@ def healthcheck(request):
 urlpatterns = [
     path("api/", healthcheck),
     path("api/auth/", include("apps.accounts.urls")),
+    path("api/admin/", include("apps.admin_portal.urls")),
     path("api/activity/", include("apps.activity.urls")),
     path("api/", include("apps.climate.urls")),
     path("api/gee/", include("apps.gee.urls")),

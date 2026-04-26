@@ -76,9 +76,30 @@ export function AuthProvider({ children }) {
 
   const register = async (input) => {
     const response = await apiClient.post("/auth/register", input);
-    const payload = response.data?.data;
-    saveAuth(payload.token, payload.user);
-    return payload;
+    return response.data?.data;
+  };
+
+  const resendVerificationEmail = async (input) => {
+    const response = await apiClient.post("/auth/verify-email/resend", input);
+    return response.data?.data;
+  };
+
+  const verifyEmail = async (tokenValue) => {
+    const response = await apiClient.post("/auth/verify-email", { token: tokenValue });
+    return response.data?.data;
+  };
+
+  const forgotPassword = async (email) => {
+    const response = await apiClient.post("/auth/forgot-password", { email });
+    return response.data?.data;
+  };
+
+  const resetPassword = async (tokenValue, newPassword) => {
+    const response = await apiClient.post("/auth/reset-password", {
+      token: tokenValue,
+      new_password: newPassword
+    });
+    return response.data?.data;
   };
 
   const logout = async () => {
@@ -120,6 +141,10 @@ export function AuthProvider({ children }) {
       isAuthenticated: Boolean(token),
       login,
       register,
+      resendVerificationEmail,
+      verifyEmail,
+      forgotPassword,
+      resetPassword,
       logout,
       verify,
       logActivity

@@ -1,0 +1,248 @@
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e8]: AG
+      - generic [ref=e9]:
+        - strong [ref=e10]: Admin GIS Climate Lab
+        - generic [ref=e11]: Không gian quản trị tách biệt khỏi giao diện client
+    - generic [ref=e12]:
+      - generic [ref=e13]: "Đăng nhập: admin"
+      - button "Làm mới khu hiện tại" [ref=e14] [cursor=pointer]:
+        - img [ref=e15]
+        - text: Làm mới khu hiện tại
+      - button "Đăng xuất" [ref=e20] [cursor=pointer]:
+        - img [ref=e21]
+        - text: Đăng xuất
+  - generic [ref=e24]:
+    - complementary [ref=e25]:
+      - generic [ref=e26]:
+        - generic [ref=e27]: Admin Console
+        - paragraph [ref=e28]: Site quản trị chỉ dành cho admin, tối ưu cho CRUD và vận hành dữ liệu khí hậu - GIS.
+      - navigation [ref=e29]:
+        - button "Tổng quan" [ref=e30] [cursor=pointer]:
+          - generic [ref=e31]:
+            - img [ref=e32]
+            - text: Tổng quan
+        - button "Người dùng 9" [ref=e35] [cursor=pointer]:
+          - generic [ref=e36]:
+            - img [ref=e37]
+            - text: Người dùng
+          - generic [ref=e42]: "9"
+        - button "Trạm quan trắc 8" [ref=e43] [cursor=pointer]:
+          - generic [ref=e44]:
+            - img [ref=e45]
+            - text: Trạm quan trắc
+          - generic [ref=e52]: "8"
+        - button "Nhập liệu thủ công 0" [ref=e53] [cursor=pointer]:
+          - generic [ref=e54]:
+            - img [ref=e55]
+            - text: Nhập liệu thủ công
+          - generic [ref=e59]: "0"
+        - button "Địa điểm 37" [ref=e60] [cursor=pointer]:
+          - generic [ref=e61]:
+            - img [ref=e62]
+            - text: Địa điểm
+          - generic [ref=e66]: "37"
+        - button "Đồng bộ GEE Online" [ref=e67] [cursor=pointer]:
+          - generic [ref=e68]:
+            - img [ref=e69]
+            - text: Đồng bộ GEE
+          - generic [ref=e80]: Online
+        - button "Nhật ký hệ thống 528" [ref=e81] [cursor=pointer]:
+          - generic [ref=e82]:
+            - img [ref=e83]
+            - text: Nhật ký hệ thống
+          - generic [ref=e85]: "528"
+    - generic [ref=e86]:
+      - generic [ref=e88]:
+        - heading "Trạm quan trắc" [level=2] [ref=e208]
+        - paragraph [ref=e90]: Quản lý master data trạm quan trắc phục vụ phân tích GIS và IDW.
+      - generic [ref=e209]:
+        - generic [ref=e210]:
+          - generic [ref=e211]:
+            - heading "Trạm quan trắc" [level=3] [ref=e212]
+            - paragraph [ref=e213]: Danh sách trạm là nguồn dữ liệu nền cho WebGIS, IDW và các thao tác nhập liệu thủ công.
+          - button "Thêm trạm" [active] [ref=e215] [cursor=pointer]:
+            - img [ref=e216]
+            - text: Thêm trạm
+        - table [ref=e218]:
+          - rowgroup [ref=e219]:
+            - row "Tên trạm Loại Tọa độ Lượng mưa Địa chỉ Hành động" [ref=e220]:
+              - columnheader "Tên trạm" [ref=e221]
+              - columnheader "Loại" [ref=e222]
+              - columnheader "Tọa độ" [ref=e223]
+              - columnheader "Lượng mưa" [ref=e224]
+              - columnheader "Địa chỉ" [ref=e225]
+              - columnheader "Hành động" [ref=e226]
+          - rowgroup [ref=e227]:
+            - row "Công ty Cổ phần Chế biến tinh bột sắn An Thái Trạm quan trắc nước thải tự động tại cơ sở An Thái; tọa độ geocode theo Xã Hiếu Giang. water 16.829170, 107.034837 - Thôn An Thái, Xã Hiếu Giang, Tỉnh Quảng Trị, Việt Nam" [ref=e228]:
+              - cell "Công ty Cổ phần Chế biến tinh bột sắn An Thái Trạm quan trắc nước thải tự động tại cơ sở An Thái; tọa độ geocode theo Xã Hiếu Giang." [ref=e229]:
+                - strong [ref=e230]: Công ty Cổ phần Chế biến tinh bột sắn An Thái
+                - generic [ref=e231]: Trạm quan trắc nước thải tự động tại cơ sở An Thái; tọa độ geocode theo Xã Hiếu Giang.
+              - cell "water" [ref=e232]:
+                - generic [ref=e233]: water
+              - cell "16.829170, 107.034837" [ref=e234]
+              - cell "-" [ref=e235]
+              - cell "Thôn An Thái, Xã Hiếu Giang, Tỉnh Quảng Trị, Việt Nam" [ref=e236]
+              - cell [ref=e237]:
+                - generic [ref=e238]:
+                  - button "Xem chi tiết" [ref=e239] [cursor=pointer]:
+                    - img [ref=e240]
+                  - button "Sửa trạm" [ref=e243] [cursor=pointer]:
+                    - img [ref=e244]
+                  - button "Xóa trạm" [ref=e247] [cursor=pointer]:
+                    - img [ref=e248]
+            - row "Công ty TNHH Dệt may VTJ Toms Trạm quan trắc nước thải tự động tại Cụm Công nghiệp Diên Sanh; tọa độ geocode theo Xã Diên Sanh. water 16.688136, 107.256045 - Cụm Công nghiệp Diên Sanh, Xã Diên Sanh, Tỉnh Quảng Trị, Việt Nam" [ref=e251]:
+              - cell "Công ty TNHH Dệt may VTJ Toms Trạm quan trắc nước thải tự động tại Cụm Công nghiệp Diên Sanh; tọa độ geocode theo Xã Diên Sanh." [ref=e252]:
+                - strong [ref=e253]: Công ty TNHH Dệt may VTJ Toms
+                - generic [ref=e254]: Trạm quan trắc nước thải tự động tại Cụm Công nghiệp Diên Sanh; tọa độ geocode theo Xã Diên Sanh.
+              - cell "water" [ref=e255]:
+                - generic [ref=e256]: water
+              - cell "16.688136, 107.256045" [ref=e257]
+              - cell "-" [ref=e258]
+              - cell "Cụm Công nghiệp Diên Sanh, Xã Diên Sanh, Tỉnh Quảng Trị, Việt Nam" [ref=e259]
+              - cell [ref=e260]:
+                - generic [ref=e261]:
+                  - button "Xem chi tiết" [ref=e262] [cursor=pointer]:
+                    - img [ref=e263]
+                  - button "Sửa trạm" [ref=e266] [cursor=pointer]:
+                    - img [ref=e267]
+                  - button "Xóa trạm" [ref=e270] [cursor=pointer]:
+                    - img [ref=e271]
+            - row "Nhà máy tinh bột sắn Hướng Hóa Trạm quan trắc nước thải tự động của Nhà máy tinh bột sắn Hướng Hóa; tọa độ geocode theo điểm Lìa gần nhà máy. water 16.471172, 106.717458 - Km 3, Xã Lìa, Tỉnh Quảng Trị, Việt Nam" [ref=e274]:
+              - cell "Nhà máy tinh bột sắn Hướng Hóa Trạm quan trắc nước thải tự động của Nhà máy tinh bột sắn Hướng Hóa; tọa độ geocode theo điểm Lìa gần nhà máy." [ref=e275]:
+                - strong [ref=e276]: Nhà máy tinh bột sắn Hướng Hóa
+                - generic [ref=e277]: Trạm quan trắc nước thải tự động của Nhà máy tinh bột sắn Hướng Hóa; tọa độ geocode theo điểm Lìa gần nhà máy.
+              - cell "water" [ref=e278]:
+                - generic [ref=e279]: water
+              - cell "16.471172, 106.717458" [ref=e280]
+              - cell "-" [ref=e281]
+              - cell "Km 3, Xã Lìa, Tỉnh Quảng Trị, Việt Nam" [ref=e282]
+              - cell [ref=e283]:
+                - generic [ref=e284]:
+                  - button "Xem chi tiết" [ref=e285] [cursor=pointer]:
+                    - img [ref=e286]
+                  - button "Sửa trạm" [ref=e289] [cursor=pointer]:
+                    - img [ref=e290]
+                  - button "Xóa trạm" [ref=e293] [cursor=pointer]:
+                    - img [ref=e294]
+            - row "Tram inspect Inspect response rainfall 16.820100, 107.102300 12.50 mm Dong Ha" [ref=e297]:
+              - cell "Tram inspect Inspect response" [ref=e298]:
+                - strong [ref=e299]: Tram inspect
+                - generic [ref=e300]: Inspect response
+              - cell "rainfall" [ref=e301]:
+                - generic [ref=e302]: rainfall
+              - cell "16.820100, 107.102300" [ref=e303]
+              - cell "12.50 mm" [ref=e304]
+              - cell "Dong Ha" [ref=e305]
+              - cell [ref=e306]:
+                - generic [ref=e307]:
+                  - button "Xem chi tiết" [ref=e308] [cursor=pointer]:
+                    - img [ref=e309]
+                  - button "Sửa trạm" [ref=e312] [cursor=pointer]:
+                    - img [ref=e313]
+                  - button "Xóa trạm" [ref=e316] [cursor=pointer]:
+                    - img [ref=e317]
+            - row "Trạm nghiền Clinke - Công ty CP Xi măng Bỉm Sơn Trạm quan trắc khí thải tại Khu công nghiệp Nam Đông Hà. air 16.792459, 107.118060 - Khu công nghiệp Nam Đông Hà, Tỉnh Quảng Trị, Việt Nam" [ref=e320]:
+              - cell "Trạm nghiền Clinke - Công ty CP Xi măng Bỉm Sơn Trạm quan trắc khí thải tại Khu công nghiệp Nam Đông Hà." [ref=e321]:
+                - strong [ref=e322]: Trạm nghiền Clinke - Công ty CP Xi măng Bỉm Sơn
+                - generic [ref=e323]: Trạm quan trắc khí thải tại Khu công nghiệp Nam Đông Hà.
+              - cell "air" [ref=e324]:
+                - generic [ref=e325]: air
+              - cell "16.792459, 107.118060" [ref=e326]
+              - cell "-" [ref=e327]
+              - cell "Khu công nghiệp Nam Đông Hà, Tỉnh Quảng Trị, Việt Nam" [ref=e328]
+              - cell [ref=e329]:
+                - generic [ref=e330]:
+                  - button "Xem chi tiết" [ref=e331] [cursor=pointer]:
+                    - img [ref=e332]
+                  - button "Sửa trạm" [ref=e335] [cursor=pointer]:
+                    - img [ref=e336]
+                  - button "Xóa trạm" [ref=e339] [cursor=pointer]:
+                    - img [ref=e340]
+            - row "Tram test admin UI Tao tu admin console test rainfall 16.820100, 107.102300 42.50 mm Dong Ha, Quang Tri" [ref=e343]:
+              - cell "Tram test admin UI Tao tu admin console test" [ref=e344]:
+                - strong [ref=e345]: Tram test admin UI
+                - generic [ref=e346]: Tao tu admin console test
+              - cell "rainfall" [ref=e347]:
+                - generic [ref=e348]: rainfall
+              - cell "16.820100, 107.102300" [ref=e349]
+              - cell "42.50 mm" [ref=e350]
+              - cell "Dong Ha, Quang Tri" [ref=e351]
+              - cell [ref=e352]:
+                - generic [ref=e353]:
+                  - button "Xem chi tiết" [ref=e354] [cursor=pointer]:
+                    - img [ref=e355]
+                  - button "Sửa trạm" [ref=e358] [cursor=pointer]:
+                    - img [ref=e359]
+                  - button "Xóa trạm" [ref=e362] [cursor=pointer]:
+                    - img [ref=e363]
+            - row "Trạm xử lý nước thải thành phố Đông Hà Trạm xử lý nước thải đô thị Đông Hà; tọa độ geocode theo trung tâm khu vực Thành phố Đông Hà do chưa có điểm trạm công khai. water 16.802493, 107.095338 - Thành phố Đông Hà, Tỉnh Quảng Trị, Việt Nam" [ref=e366]:
+              - cell "Trạm xử lý nước thải thành phố Đông Hà Trạm xử lý nước thải đô thị Đông Hà; tọa độ geocode theo trung tâm khu vực Thành phố Đông Hà do chưa có điểm trạm công khai." [ref=e367]:
+                - strong [ref=e368]: Trạm xử lý nước thải thành phố Đông Hà
+                - generic [ref=e369]: Trạm xử lý nước thải đô thị Đông Hà; tọa độ geocode theo trung tâm khu vực Thành phố Đông Hà do chưa có điểm trạm công khai.
+              - cell "water" [ref=e370]:
+                - generic [ref=e371]: water
+              - cell "16.802493, 107.095338" [ref=e372]
+              - cell "-" [ref=e373]
+              - cell "Thành phố Đông Hà, Tỉnh Quảng Trị, Việt Nam" [ref=e374]
+              - cell [ref=e375]:
+                - generic [ref=e376]:
+                  - button "Xem chi tiết" [ref=e377] [cursor=pointer]:
+                    - img [ref=e378]
+                  - button "Sửa trạm" [ref=e381] [cursor=pointer]:
+                    - img [ref=e382]
+                  - button "Xóa trạm" [ref=e385] [cursor=pointer]:
+                    - img [ref=e386]
+            - row "Trạm xử lý nước thải thị xã Quảng Trị Trạm xử lý nước thải đô thị thị xã Quảng Trị; tọa độ geocode theo Phường Quảng Trị do chưa có điểm trạm công khai. water 16.693851, 107.156609 - Phường Quảng Trị, Tỉnh Quảng Trị, Việt Nam" [ref=e389]:
+              - cell "Trạm xử lý nước thải thị xã Quảng Trị Trạm xử lý nước thải đô thị thị xã Quảng Trị; tọa độ geocode theo Phường Quảng Trị do chưa có điểm trạm công khai." [ref=e390]:
+                - strong [ref=e391]: Trạm xử lý nước thải thị xã Quảng Trị
+                - generic [ref=e392]: Trạm xử lý nước thải đô thị thị xã Quảng Trị; tọa độ geocode theo Phường Quảng Trị do chưa có điểm trạm công khai.
+              - cell "water" [ref=e393]:
+                - generic [ref=e394]: water
+              - cell "16.693851, 107.156609" [ref=e395]
+              - cell "-" [ref=e396]
+              - cell "Phường Quảng Trị, Tỉnh Quảng Trị, Việt Nam" [ref=e397]
+              - cell [ref=e398]:
+                - generic [ref=e399]:
+                  - button "Xem chi tiết" [ref=e400] [cursor=pointer]:
+                    - img [ref=e401]
+                  - button "Sửa trạm" [ref=e404] [cursor=pointer]:
+                    - img [ref=e405]
+                  - button "Xóa trạm" [ref=e408] [cursor=pointer]:
+                    - img [ref=e409]
+  - dialog [ref=e412]:
+    - generic [ref=e413]:
+      - generic [ref=e414]:
+        - heading "Thêm trạm quan trắc" [level=3] [ref=e415]
+        - paragraph [ref=e416]: Biểu mẫu quản trị nội bộ cho master data trạm.
+      - button "Đóng popup" [ref=e417] [cursor=pointer]:
+        - img [ref=e418]
+    - generic [ref=e422]:
+      - generic [ref=e423]:
+        - generic [ref=e424]: Tên trạm
+        - textbox [ref=e425]
+      - generic [ref=e426]:
+        - generic [ref=e427]: Loại trạm
+        - combobox [ref=e428]:
+          - option "water" [selected]
+          - option "air"
+          - option "rainfall"
+      - generic [ref=e429]:
+        - generic [ref=e430]: Vĩ độ
+        - spinbutton [ref=e431]
+      - generic [ref=e432]:
+        - generic [ref=e433]: Kinh độ
+        - spinbutton [ref=e434]
+      - generic [ref=e435]:
+        - generic [ref=e436]: Lượng mưa hiện tại (mm)
+        - spinbutton [ref=e437]
+      - generic [ref=e438]:
+        - generic [ref=e439]: Địa chỉ / mô tả vị trí
+        - textbox [ref=e440]
+      - generic [ref=e441]:
+        - generic [ref=e442]: Mô tả nguồn
+        - textbox [ref=e443]
+    - generic [ref=e444]:
+      - button "Hủy" [ref=e445] [cursor=pointer]
+      - button "Tạo mới" [ref=e446] [cursor=pointer]

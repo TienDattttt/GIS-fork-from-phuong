@@ -448,6 +448,7 @@ class MonitoringStationsView(APIView):
                 rainfall_mm=float(data.get("rainfall_mm")) if data.get("rainfall_mm") not in (None, "") else None,
                 source_description=source_description,
                 address=address,
+                created_at=timezone.now(),
             )
         except ValueError as exc:
             return fail(str(exc), 400, "validation_error")

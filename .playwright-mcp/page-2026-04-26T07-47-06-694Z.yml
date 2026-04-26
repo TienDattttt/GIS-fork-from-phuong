@@ -1,0 +1,18 @@
+- generic [ref=e4]:
+  - heading "Đăng nhập" [level=1] [ref=e5]
+  - paragraph [ref=e6]: Truy cập hệ thống phân tích khí hậu và WebGIS của Do An GIS.
+  - generic [ref=e7]:
+    - generic [ref=e8]:
+      - generic [ref=e9]: Tên đăng nhập
+      - textbox "Tên đăng nhập" [ref=e10]
+    - generic [ref=e11]:
+      - generic [ref=e12]: Mật khẩu
+      - textbox "Mật khẩu" [ref=e13]
+    - button "Đăng nhập" [ref=e14] [cursor=pointer]
+  - generic [ref=e15]:
+    - link "Quên mật khẩu?" [ref=e16] [cursor=pointer]:
+      - /url: /forgot-password
+    - generic [ref=e17]:
+      - text: Chưa có tài khoản?
+      - link "Đăng ký ngay" [ref=e18] [cursor=pointer]:
+        - /url: /register

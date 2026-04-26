@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Circle, CircleMarker, MapContainer, Polyline, Popup, TileLayer, useMap } from "react-leaflet";
+import { Circle, CircleMarker, MapContainer, Polyline, Popup, TileLayer, useMap, useMapEvents } from "react-leaflet";
 
 import { apiClient } from "../api/client";
 import { useAuth } from "../context/AuthContext";
@@ -11,16 +11,22 @@ const AI_TU_POSITION = {
   lng: 107.1402167,
   label: "Vi tri mau Ai Tu",
 };
+const DEFAULT_MAP_VIEW = {
+  center: [AI_TU_POSITION.lat, AI_TU_POSITION.lng],
+  zoom: 10,
+};
 const RADIUS_OPTIONS_KM = [5, 10, 20, 50, 100];
 
 const EMPTY_FORM = {
   id: null,
   name: "",
   stationType: "water",
-  lat: "",
-  lon: "",
   rainfallMm: "",
   sourceDescription: "",
+  address: "",
+  locationQuery: "",
+  lat: "",
+  lon: "",
 };
 
 const STATION_COLORS = {
@@ -33,7 +39,7 @@ function getMarkerColor(stationType) {
   return STATION_COLORS[stationType] || "#5c677d";
 }
 
-function RouteBoundsController({ routeLine, fallbackCenter }) {
+function StationMapController({ routeLine, center, zoom }) {
   const map = useMap();
 
   useEffect(() => {
@@ -41,9 +47,21 @@ function RouteBoundsController({ routeLine, fallbackCenter }) {
       map.fitBounds(routeLine, { padding: [24, 24] });
       return;
     }
-    map.flyTo(fallbackCenter, map.getZoom(), { animate: true, duration: 0.8 });
-  }, [fallbackCenter, map, routeLine]);
+    map.flyTo(center, zoom, { animate: true, duration: 0.8 });
+  }, [center, map, routeLine, zoom]);
 
+  return null;
+}
+
+function StationMapPicker({ enabled, onPick }) {
+  useMapEvents({
+    click(event) {
+      if (!enabled) {
+        return;
+      }
+      onPick(event.latlng.lat, event.latlng.lng);
+    },
+  });
   return null;
 }
 
@@ -55,6 +73,7 @@ function toStationPayload(form) {
     lon: Number(form.lon),
     rainfall_mm: form.rainfallMm === "" ? null : Number(form.rainfallMm),
     source_description: form.sourceDescription,
+    address: form.address || null,
   };
 }
 
@@ -72,6 +91,11 @@ export default function StationsPage() {
   const [routeInfo, setRouteInfo] = useState(null);
   const [activeStationId, setActiveStationId] = useState(null);
   const [activeRadiusKm, setActiveRadiusKm] = useState(null);
+  const [mapView, setMapView] = useState(DEFAULT_MAP_VIEW);
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchingLocation, setSearchingLocation] = useState(false);
+  const [pinningMode, setPinningMode] = useState(false);
+  const [resolvingPoint, setResolvingPoint] = useState(false);
 
   useEffect(() => {
     void logActivity("page_view", "stations");
@@ -93,6 +117,15 @@ export default function StationsPage() {
   useEffect(() => {
     void loadStations();
   }, []);
+
+  const draftPosition = useMemo(() => {
+    const lat = Number(form.lat);
+    const lon = Number(form.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+      return null;
+    }
+    return { lat, lon };
+  }, [form.lat, form.lon]);
 
   const stationsWithDistance = useMemo(
     () =>
@@ -121,27 +154,6 @@ export default function StationsPage() {
     }
   }, [activeStationId, visibleStations]);
 
-  const mapCenter = useMemo(() => {
-    if (currentPosition) {
-      return [Number(currentPosition.lat), Number(currentPosition.lng)];
-    }
-
-    if (activeStationId) {
-      const station = visibleStations.find((item) => item.id === activeStationId);
-      if (station) {
-        return [Number(station.lat), Number(station.lon)];
-      }
-    }
-
-    if (visibleStations.length > 0) {
-      const lat = visibleStations.reduce((sum, item) => sum + Number(item.lat || 0), 0) / visibleStations.length;
-      const lon = visibleStations.reduce((sum, item) => sum + Number(item.lon || 0), 0) / visibleStations.length;
-      return [lat, lon];
-    }
-
-    return DEFAULT_CENTER;
-  }, [activeStationId, currentPosition, visibleStations]);
-
   const routeLine = useMemo(() => {
     const coordinates = routeInfo?.geometry?.coordinates || [];
     return coordinates.map(([lng, lat]) => [lat, lng]);
@@ -149,6 +161,10 @@ export default function StationsPage() {
 
   function resetForm() {
     setForm(EMPTY_FORM);
+    setSearchResults([]);
+    setPinningMode(false);
+    setResolvingPoint(false);
+    setMapView(DEFAULT_MAP_VIEW);
   }
 
   function toggleRadiusFilter(radiusKm) {
@@ -162,6 +178,7 @@ export default function StationsPage() {
     setUsingLivePosition(false);
     setRouteInfo(null);
     setActiveStationId(null);
+    setMapView({ center: [AI_TU_POSITION.lat, AI_TU_POSITION.lng], zoom: 10 });
     setStatus("Da dua vi tri goc ve diem mau tai Ai Tu.");
     setStatusType("ok");
   }
@@ -175,14 +192,16 @@ export default function StationsPage() {
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        setCurrentPosition({
+        const next = {
           lat: position.coords.latitude,
           lng: position.coords.longitude,
           label: "Vi tri hien tai cua ban",
-        });
+        };
+        setCurrentPosition(next);
         setUsingLivePosition(true);
         setRouteInfo(null);
         setActiveStationId(null);
+        setMapView({ center: [next.lat, next.lng], zoom: 12 });
         setStatus("Da cap nhat vi tri hien tai cua ban tren ban do.");
         setStatusType("ok");
       },
@@ -194,10 +213,117 @@ export default function StationsPage() {
     );
   }
 
+  async function searchApproximateLocation() {
+    const query = form.locationQuery.trim();
+    if (query.length < 2) {
+      setStatus("Hay nhap it nhat 2 ky tu de tim dia diem.");
+      setStatusType("error");
+      return;
+    }
+
+    setSearchingLocation(true);
+    setStatus("");
+    try {
+      const response = await apiClient.get("/map/geocode", {
+        params: {
+          q: query,
+          limit: 5,
+        },
+      });
+      const results = response.data?.data || [];
+      setSearchResults(results);
+      if (!results.length) {
+        setStatus("Khong tim thay dia diem gan dung. Thu mo ta cu the hon.");
+        setStatusType("warn");
+        return;
+      }
+      const first = results[0];
+      setMapView({
+        center: [Number(first.lat), Number(first.lng)],
+        zoom: 13,
+      });
+      setPinningMode(true);
+      setStatus("Da tim thay vi tri gan dung. Hay click len ban do de ghim toa do chinh xac.");
+      setStatusType("ok");
+    } catch (error) {
+      setSearchResults([]);
+      setStatus(error.response?.data?.error?.message || "Khong tim duoc dia diem.");
+      setStatusType("error");
+    } finally {
+      setSearchingLocation(false);
+    }
+  }
+
+  async function applySuggestedLocation(result) {
+    const lat = Number(result.lat);
+    const lon = Number(result.lng);
+    setForm((prev) => ({
+      ...prev,
+      locationQuery: result.display_name || prev.locationQuery,
+      lat: lat.toFixed(6),
+      lon: lon.toFixed(6),
+    }));
+    setMapView({
+      center: [lat, lon],
+      zoom: 14,
+    });
+    setSearchResults([]);
+    setPinningMode(true);
+    await resolvePinnedPoint(lat, lon, { preserveAddress: true, nextLocationQuery: result.display_name || "" });
+  }
+
+  async function resolvePinnedPoint(lat, lon, options = {}) {
+    setResolvingPoint(true);
+    try {
+      const response = await apiClient.get("/map/reverse", {
+        params: {
+          lat,
+          lng: lon,
+        },
+      });
+      const displayName = response.data?.data?.display_name || "";
+      setForm((prev) => ({
+        ...prev,
+        lat: Number(lat).toFixed(6),
+        lon: Number(lon).toFixed(6),
+        locationQuery: options.nextLocationQuery || displayName || prev.locationQuery,
+        address: options.preserveAddress ? prev.address : prev.address || displayName,
+      }));
+      setStatus("Da ghim xong vi tri chinh xac tren ban do. Ban co the bo sung mo ta dia diem cu the ben duoi.");
+      setStatusType("ok");
+    } catch {
+      setForm((prev) => ({
+        ...prev,
+        lat: Number(lat).toFixed(6),
+        lon: Number(lon).toFixed(6),
+      }));
+      setStatus("Da ghim toa do tren ban do nhung khong reverse geocode duoc dia chi.");
+      setStatusType("warn");
+    } finally {
+      setResolvingPoint(false);
+    }
+  }
+
+  async function handleMapPick(lat, lon) {
+    setPinningMode(true);
+    setMapView({
+      center: [lat, lon],
+      zoom: 15,
+    });
+    await resolvePinnedPoint(lat, lon);
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
     setSaving(true);
     setStatus("");
+
+    if (!draftPosition) {
+      setStatus("Hay tim dia diem va ghim mot vi tri chinh xac tren ban do truoc khi luu tram.");
+      setStatusType("error");
+      setSaving(false);
+      return;
+    }
 
     try {
       const payload = toStationPayload(form);
@@ -224,12 +350,20 @@ export default function StationsPage() {
       id: station.id,
       name: station.name,
       stationType: station.station_type,
-      lat: station.lat,
-      lon: station.lon,
       rainfallMm: station.rainfall_mm ?? "",
       sourceDescription: station.source_description || "",
+      address: station.address || "",
+      locationQuery: station.address || station.name,
+      lat: Number(station.lat).toFixed(6),
+      lon: Number(station.lon).toFixed(6),
     });
+    setSearchResults([]);
+    setPinningMode(true);
     setActiveStationId(station.id);
+    setMapView({
+      center: [Number(station.lat), Number(station.lon)],
+      zoom: 14,
+    });
   }
 
   async function deleteStation(stationId) {
@@ -269,6 +403,10 @@ export default function StationsPage() {
         },
       });
       setRouteInfo(response.data?.data || null);
+      setMapView({
+        center: [Number(station.lat), Number(station.lon)],
+        zoom: 13,
+      });
       setStatus(`Da tinh xong quang duong tu ${currentPosition.label || "diem goc hien tai"} toi tram ${station.name}.`);
       setStatusType("ok");
     } catch (error) {
@@ -306,14 +444,46 @@ export default function StationsPage() {
               <option value="rainfall">rainfall</option>
             </select>
           </div>
-          <div className="field">
-            <label>Vi do</label>
-            <input type="number" step="0.000001" value={form.lat} onChange={(event) => setForm((prev) => ({ ...prev, lat: event.target.value }))} />
+
+          <div className="field station-form-grid__wide">
+            <label>Tim dia diem gan dung</label>
+            <div className="map-search-box">
+              <input
+                value={form.locationQuery}
+                onChange={(event) => setForm((prev) => ({ ...prev, locationQuery: event.target.value }))}
+                placeholder="Nhap ten khu vuc, duong, cau, song, nha may..."
+              />
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => void searchApproximateLocation()}
+                disabled={searchingLocation}
+              >
+                {searchingLocation ? "Dang tim..." : "Tim dia diem"}
+              </button>
+            </div>
+            <div className="field-note">
+              Buoc 1: tim dia diem gan dung. Buoc 2: click len ban do de ghim toa do chinh xac.
+            </div>
+            {searchResults.length ? (
+              <div className="map-search-results">
+                {searchResults.map((result, index) => (
+                  <button
+                    key={`${result.display_name}-${index}`}
+                    type="button"
+                    className="map-search-result"
+                    onClick={() => void applySuggestedLocation(result)}
+                  >
+                    <strong>{result.display_name}</strong>
+                    <span>
+                      {Number(result.lat).toFixed(5)}, {Number(result.lng).toFixed(5)}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : null}
           </div>
-          <div className="field">
-            <label>Kinh do</label>
-            <input type="number" step="0.000001" value={form.lon} onChange={(event) => setForm((prev) => ({ ...prev, lon: event.target.value }))} />
-          </div>
+
           <div className="field">
             <label>Luong mua (mm)</label>
             <input
@@ -323,6 +493,28 @@ export default function StationsPage() {
               onChange={(event) => setForm((prev) => ({ ...prev, rainfallMm: event.target.value }))}
             />
           </div>
+
+          <div className="field">
+            <label>Toa do da ghim</label>
+            <div className="field-note">
+              {draftPosition
+                ? `lat ${draftPosition.lat.toFixed(6)}, lon ${draftPosition.lon.toFixed(6)}`
+                : pinningMode
+                  ? "Hay click len ban do de chot vi tri."
+                  : "Chua co toa do. Tim dia diem hoac click map de ghim."}
+            </div>
+          </div>
+
+          <div className="field station-form-grid__wide">
+            <label>Thong tin vi tri cu the</label>
+            <textarea
+              rows={3}
+              value={form.address}
+              onChange={(event) => setForm((prev) => ({ ...prev, address: event.target.value }))}
+              placeholder="Vi du: Cach cau Ai Tu 200m ve huong Dong, ben bo song..."
+            />
+          </div>
+
           <div className="field station-form-grid__wide">
             <label>Mo ta nguon</label>
             <input
@@ -331,8 +523,9 @@ export default function StationsPage() {
               placeholder="Vi du: Song Sai Gon - cau Binh Phuoc"
             />
           </div>
+
           <div className="actions">
-            <button type="submit" className="btn btn-primary" disabled={saving}>
+            <button type="submit" className="btn btn-primary" disabled={saving || resolvingPoint}>
               {saving ? "Dang luu..." : form.id ? "Cap nhat tram" : "Them tram"}
             </button>
             {form.id ? (
@@ -350,16 +543,17 @@ export default function StationsPage() {
             <h3>Ban do tram quan trac</h3>
             <p>
               Diem goc mac dinh duoc seed tai Ai Tu. Bam vao vong ban kinh de chi hien thi cac tram nam trong pham
-              vi do.
+              vi do. Khi dang them hoac sua tram, hay click len map de ghim toa do chinh xac.
             </p>
           </div>
           <div className="station-map-meta">
             <span className={`tag ${usingLivePosition ? "ok" : "warn"}`}>
               {usingLivePosition ? "Dang dung vi tri that" : "Dang dung vi tri mau Ai Tu"}
             </span>
+            {pinningMode ? <span className="tag custom">Che do ghim vi tri</span> : null}
             {routeInfo ? (
               <div className="tag ok">
-                {formatDistanceKm(Number(routeInfo.distance_m || 0) / 1000)} · {formatDuration(routeInfo.duration_s)}
+                {formatDistanceKm(Number(routeInfo.distance_m || 0) / 1000)} Â· {formatDuration(routeInfo.duration_s)}
               </div>
             ) : null}
           </div>
@@ -394,12 +588,13 @@ export default function StationsPage() {
         </div>
 
         <div className="station-map-wrapper">
-          <MapContainer center={mapCenter} zoom={9} style={{ height: "100%", width: "100%" }}>
+          <MapContainer center={mapView.center} zoom={mapView.zoom} style={{ height: "100%", width: "100%" }}>
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
-            <RouteBoundsController routeLine={routeLine} fallbackCenter={mapCenter} />
+            <StationMapController routeLine={routeLine} center={mapView.center} zoom={mapView.zoom} />
+            <StationMapPicker enabled={Boolean(form.name || form.id || form.locationQuery)} onPick={(lat, lon) => void handleMapPick(lat, lon)} />
 
             {currentPosition
               ? [...RADIUS_OPTIONS_KM].reverse().map((radiusKm) => (
@@ -447,8 +642,14 @@ export default function StationsPage() {
                 <Popup>
                   <strong>{station.name}</strong>
                   <div>Loai: {station.station_type}</div>
-                  <div>Luong mua: {station.rainfall_mm !== null && station.rainfall_mm !== undefined ? `${Number(station.rainfall_mm).toFixed(2)} mm` : "Chua nhap"}</div>
+                  <div>
+                    Luong mua:{" "}
+                    {station.rainfall_mm !== null && station.rainfall_mm !== undefined
+                      ? `${Number(station.rainfall_mm).toFixed(2)} mm`
+                      : "Chua nhap"}
+                  </div>
                   <div>Khoang cach: {station.distanceKm !== null ? formatDistanceKm(station.distanceKm) : "Chua xac dinh"}</div>
+                  <div>{station.address || "Chua co mo ta vi tri cu the"}</div>
                   <div>{station.source_description || "Chua co mo ta nguon"}</div>
                 </Popup>
               </CircleMarker>
@@ -464,6 +665,22 @@ export default function StationsPage() {
               </CircleMarker>
             ) : null}
 
+            {draftPosition ? (
+              <CircleMarker
+                center={[draftPosition.lat, draftPosition.lon]}
+                radius={9}
+                pathOptions={{ color: "#d84315", fillColor: "#f57c00", fillOpacity: 0.92 }}
+              >
+                <Popup>
+                  <strong>Vi tri tram dang chinh sua</strong>
+                  <div>
+                    {draftPosition.lat.toFixed(6)}, {draftPosition.lon.toFixed(6)}
+                  </div>
+                  <div>{form.address || form.locationQuery || "Hay bo sung mo ta vi tri."}</div>
+                </Popup>
+              </CircleMarker>
+            ) : null}
+
             {routeLine.length > 1 ? <Polyline positions={routeLine} pathOptions={{ color: "#ff6b35", weight: 4 }} /> : null}
           </MapContainer>
         </div>
@@ -472,6 +689,7 @@ export default function StationsPage() {
           <span><i style={{ background: STATION_COLORS.water }} /> water</span>
           <span><i style={{ background: STATION_COLORS.air }} /> air</span>
           <span><i style={{ background: STATION_COLORS.rainfall }} /> rainfall</span>
+          <span><i style={{ background: "#f57c00" }} /> vi tri tram dang ghim</span>
           {activeRadiusKm ? <span><i style={{ background: "#f57c00" }} /> loc trong {activeRadiusKm} km</span> : null}
         </div>
       </section>
@@ -498,6 +716,7 @@ export default function StationsPage() {
               <th>Lat</th>
               <th>Lon</th>
               <th>Rainfall (mm)</th>
+              <th>Vi tri cu the</th>
               <th>Source description</th>
               <th>Actions</th>
             </tr>
@@ -509,7 +728,12 @@ export default function StationsPage() {
                 <td>{station.station_type}</td>
                 <td>{Number(station.lat).toFixed(6)}</td>
                 <td>{Number(station.lon).toFixed(6)}</td>
-                <td>{station.rainfall_mm !== null && station.rainfall_mm !== undefined ? Number(station.rainfall_mm).toFixed(2) : "-"}</td>
+                <td>
+                  {station.rainfall_mm !== null && station.rainfall_mm !== undefined
+                    ? Number(station.rainfall_mm).toFixed(2)
+                    : "-"}
+                </td>
+                <td>{station.address || "-"}</td>
                 <td>{station.source_description || "-"}</td>
                 <td>
                   <div className="table-actions">
@@ -529,7 +753,7 @@ export default function StationsPage() {
 
             {!visibleStations.length && !loading ? (
               <tr>
-                <td colSpan={7}>
+                <td colSpan={8}>
                   {stations.length ? "Khong co tram nao nam trong ban kinh dang chon." : "Chua co tram quan trac nao."}
                 </td>
               </tr>

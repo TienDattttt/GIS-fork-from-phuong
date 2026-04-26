@@ -1,0 +1,161 @@
+- generic [ref=e19]:
+  - banner [ref=e20]:
+    - link "GIS Climate Lab" [ref=e22] [cursor=pointer]:
+      - /url: /
+    - navigation [ref=e23]:
+      - link "Quản trị" [ref=e24] [cursor=pointer]:
+        - /url: /admin
+        - img [ref=e25]
+        - text: Quản trị
+      - link "Dashboard" [ref=e28] [cursor=pointer]:
+        - /url: /
+      - link "Về chúng tôi" [ref=e29] [cursor=pointer]:
+        - /url: /about
+      - link "Bản đồ" [ref=e30] [cursor=pointer]:
+        - /url: /map
+      - link "Trạm quan trắc" [ref=e31] [cursor=pointer]:
+        - /url: /stations
+      - link "Lượng mưa" [ref=e32] [cursor=pointer]:
+        - /url: /rainfall
+      - link "Tính mưa IDW" [ref=e33] [cursor=pointer]:
+        - /url: /rainfall-calculation
+      - link "Nhiệt độ" [ref=e34] [cursor=pointer]:
+        - /url: /temperature
+      - link "Độ ẩm đất" [ref=e35] [cursor=pointer]:
+        - /url: /soil-moisture
+      - link "NDVI" [ref=e36] [cursor=pointer]:
+        - /url: /ndvi
+      - link "TVDI" [ref=e37] [cursor=pointer]:
+        - /url: /tvdi
+      - link "Nhập liệu" [ref=e38] [cursor=pointer]:
+        - /url: /data-entry
+      - link "Hoạt động" [ref=e39] [cursor=pointer]:
+        - /url: /activity
+    - generic [ref=e40]:
+      - generic [ref=e41]: System Administrator
+      - button "Đăng xuất" [ref=e42] [cursor=pointer]:
+        - img [ref=e43]
+        - text: Đăng xuất
+  - main [ref=e46]:
+    - generic [ref=e47]:
+      - generic [ref=e48]:
+        - heading "Dashboard khí hậu tổng quan" [level=1] [ref=e49]
+        - paragraph [ref=e50]: Theo dõi nhanh lượng mưa, nhiệt độ, độ ẩm đất, NDVI và TVDI theo địa điểm và khoảng thời gian lựa chọn.
+      - generic [ref=e51]: Đã cập nhật dashboard tổng quan.
+      - generic [ref=e52]:
+        - generic [ref=e53]:
+          - generic [ref=e54]: Địa điểm
+          - combobox [ref=e55]:
+            - option "An Giang" [selected]
+            - option "Bắc Ninh"
+            - option "Cà Mau"
+            - option "Cần Thơ"
+            - option "Cao Bằng"
+            - option "Đà Nẵng"
+            - option "Đắk Lắk"
+            - option "Điện Biên"
+            - option "Đồng Nai"
+            - option "Đồng Tháp"
+            - option "Gia Lai"
+            - option "Hà Nội"
+            - option "Hà Tĩnh"
+            - option "Hải Phòng"
+            - option "Hồ Chí Minh"
+            - option "Huế"
+            - option "Hưng Yên"
+            - option "Khánh Hòa"
+            - option "Lai Châu"
+            - option "Lâm Đồng"
+            - option "Lạng Sơn"
+            - option "Lào Cai"
+            - option "Nghệ An"
+            - option "Ninh Bình"
+            - option "Phú Thọ"
+            - option "Quảng Ngãi"
+            - option "Quảng Ninh"
+            - option "Quảng Trị"
+            - option "Quảng Trị"
+            - option "Sơn La"
+            - option "Tây Ninh"
+            - option "Thái Nguyên"
+            - option "Thanh Hóa"
+            - option "Tuyên Quang"
+            - option "Vĩnh Long"
+        - generic [ref=e56]:
+          - generic [ref=e57]: Từ ngày
+          - textbox [ref=e58]: 2020-01-01
+        - generic [ref=e59]:
+          - generic [ref=e60]: Đến ngày
+          - textbox [ref=e61]: 2020-12-31
+        - button "Làm mới dashboard" [ref=e63] [cursor=pointer]
+      - generic [ref=e64]:
+        - generic [ref=e65]:
+          - heading "Tổng lượng mưa (mm)" [level=4] [ref=e66]
+          - paragraph [ref=e67]: "0.00"
+        - generic [ref=e68]:
+          - heading "Nhiệt độ TB (°C)" [level=4] [ref=e69]
+          - paragraph [ref=e70]: "0.00"
+        - generic [ref=e71]:
+          - heading "Độ ẩm bề mặt" [level=4] [ref=e72]
+          - paragraph [ref=e73]: "0.0000"
+        - generic [ref=e74]:
+          - heading "NDVI TB" [level=4] [ref=e75]
+          - paragraph [ref=e76]: "0.0000"
+        - generic [ref=e77]:
+          - heading "TVDI TB" [level=4] [ref=e78]
+          - paragraph [ref=e79]: "0.0000"
+        - generic [ref=e80]:
+          - heading "Ngày hạn nặng" [level=4] [ref=e81]
+          - paragraph [ref=e82]: "0"
+      - generic [ref=e83]:
+        - generic [ref=e84]:
+          - heading "Diễn biến mưa và nhiệt độ" [level=3] [ref=e85]
+          - img [ref=e86]
+        - generic [ref=e87]:
+          - heading "Diễn biến NDVI và TVDI" [level=3] [ref=e88]
+          - img [ref=e89]
+      - generic [ref=e91]:
+        - heading "Độ ẩm đất bề mặt và tầng rễ" [level=3] [ref=e92]
+        - img [ref=e93]
+      - generic [ref=e94]:
+        - generic [ref=e95]:
+          - heading "Tóm tắt nhanh" [level=3] [ref=e96]
+          - paragraph [ref=e97]:
+            - text: Dashboard này đọc dữ liệu đã đồng bộ trong cơ sở dữ liệu. Nếu biểu đồ còn trống, hãy vào từng mô-đun và dùng chức năng
+            - strong [ref=e98]: Tải từ GEE
+            - text: để đồng bộ dữ liệu trước.
+        - generic [ref=e99]:
+          - heading "Địa điểm đang theo dõi" [level=3] [ref=e100]
+          - paragraph [ref=e101]:
+            - text: "Địa điểm hiện tại:"
+            - strong [ref=e102]: An Giang
+            - text: . Bạn có thể đổi địa điểm phía trên để xem toàn bộ dashboard theo vùng khác.
+      - generic [ref=e103]:
+        - link "Lượng mưa Theo dõi lượng mưa, so sánh giai đoạn và đối chiếu giữa các địa điểm." [ref=e104] [cursor=pointer]:
+          - /url: /rainfall
+          - heading "Lượng mưa" [level=3] [ref=e105]
+          - paragraph [ref=e106]: Theo dõi lượng mưa, so sánh giai đoạn và đối chiếu giữa các địa điểm.
+        - link "Nhiệt độ Phân tích nhiệt độ theo ngày và biên độ theo tháng." [ref=e107] [cursor=pointer]:
+          - /url: /temperature
+          - heading "Nhiệt độ" [level=3] [ref=e108]
+          - paragraph [ref=e109]: Phân tích nhiệt độ theo ngày và biên độ theo tháng.
+        - link "Độ ẩm đất Quan sát độ ẩm bề mặt, tầng rễ và toàn hồ sơ đất." [ref=e110] [cursor=pointer]:
+          - /url: /soil-moisture
+          - heading "Độ ẩm đất" [level=3] [ref=e111]
+          - paragraph [ref=e112]: Quan sát độ ẩm bề mặt, tầng rễ và toàn hồ sơ đất.
+        - link "NDVI Đánh giá sức khỏe thảm thực vật và mức độ che phủ xanh." [ref=e113] [cursor=pointer]:
+          - /url: /ndvi
+          - heading "NDVI" [level=3] [ref=e114]
+          - paragraph [ref=e115]: Đánh giá sức khỏe thảm thực vật và mức độ che phủ xanh.
+        - link "TVDI Theo dõi hạn hán, TVDI, LST và các đợt khô hạn nghiêm trọng." [ref=e116] [cursor=pointer]:
+          - /url: /tvdi
+          - heading "TVDI" [level=3] [ref=e117]
+          - paragraph [ref=e118]: Theo dõi hạn hán, TVDI, LST và các đợt khô hạn nghiêm trọng.
+        - link "Bản đồ WebGIS Xem vị trí, ranh giới và chọn nhanh địa điểm trực tiếp trên bản đồ." [ref=e119] [cursor=pointer]:
+          - /url: /map
+          - heading "Bản đồ WebGIS" [level=3] [ref=e120]
+          - paragraph [ref=e121]: Xem vị trí, ranh giới và chọn nhanh địa điểm trực tiếp trên bản đồ.
+        - link "Hoạt động Xem lịch sử thao tác và thống kê sử dụng của tài khoản." [ref=e122] [cursor=pointer]:
+          - /url: /activity
+          - heading "Hoạt động" [level=3] [ref=e123]
+          - paragraph [ref=e124]: Xem lịch sử thao tác và thống kê sử dụng của tài khoản.
