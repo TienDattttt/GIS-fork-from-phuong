@@ -13,7 +13,7 @@ function parseAuthError(error) {
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { login, resendVerificationEmail, isAuthenticated, ready } = useAuth();
+  const { login, resendVerificationEmail, isAuthenticated, ready, user } = useAuth();
   const [form, setForm] = useState({ username: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -25,8 +25,9 @@ export default function LoginPage() {
     setResendState({ visible: false, loading: false, message: "", error: "" });
     setLoading(true);
     try {
-      await login(form.username.trim(), form.password);
-      navigate("/", { replace: true });
+      const payload = await login(form.username.trim(), form.password);
+      const target = payload?.user?.role === "admin" ? "/admin" : "/";
+      navigate(target, { replace: true });
     } catch (err) {
       const authError = parseAuthError(err);
       setError(authError.message);
@@ -56,9 +57,10 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (ready && isAuthenticated) {
-      navigate("/", { replace: true });
+      const target = user?.role === "admin" ? "/admin" : "/";
+      navigate(target, { replace: true });
     }
-  }, [isAuthenticated, navigate, ready]);
+  }, [isAuthenticated, navigate, ready, user]);
 
   return (
     <div className="auth-shell">
